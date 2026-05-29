@@ -17,6 +17,7 @@ import { loadArtefact } from "./lib/artefact.js";
 import { runLiveProbes } from "./lib/checks/live-probes.js";
 import { runTopology } from "./lib/checks/topology.js";
 import { buildGetterSpecs } from "./lib/catalogue/getters.js";
+import { loadNetworks, resolveChainEntry, rpcEnvVarFor } from "./lib/networks.js";
 import { runParity } from "./lib/parity.js";
 import { render } from "./lib/render.js";
 import { buildReport, writeReport } from "./lib/report.js";
@@ -36,6 +37,7 @@ const REPO_ROOT = process.cwd();
 interface Args {
   env: Env;
   chain: ChainKind;
+  network?: string;
   rpc?: string;
   mode: RenderMode;
   strict: boolean;
@@ -45,6 +47,7 @@ interface Args {
 function parseArgs(argv: string[]): Args {
   let env: Env | undefined;
   let chain: ChainKind | undefined;
+  let network: string | undefined;
   let rpc: string | undefined;
   let mode: RenderMode = "full";
   let strict = false;
@@ -58,6 +61,9 @@ function parseArgs(argv: string[]): Args {
         break;
       case "--chain":
         chain = requireChain(argv[++i]);
+        break;
+      case "--network":
+        network = argv[++i];
         break;
       case "--rpc":
         rpc = argv[++i];
@@ -89,7 +95,7 @@ function parseArgs(argv: string[]): Args {
     printHelp();
     throw new Error("--env <preprod|staging|prod> and --chain <accounting|earning> are required");
   }
-  return { env, chain, rpc, mode, strict, noLiveProbes };
+  return { env, chain, network, rpc, mode, strict, noLiveProbes };
 }
 
 function requireEnv(v: string | undefined): Env {
@@ -167,9 +173,19 @@ async function main(): Promise<number> {
   const start = Date.now();
   const args = parseArgs(process.argv.slice(2));
 
+  const networks = loadNetworks(REPO_ROOT);
+  const chainEntry = resolveChainEntry(networks, args.env, args.chain, args.network);
+
   const loaded = loadConfig(args.env, args.chain);
-  const artefact = loadArtefact(args.env, args.chain, REPO_ROOT);
-  const rpc = resolveRpc(args.env, args.chain, loaded.expectedChainId, args.rpc);
+  const artefact = loadArtefact(args.env, args.chain, chainEntry.network, REPO_ROOT);
+  const rpc = resolveRpc({
+    env: args.env,
+    kind: args.chain,
+    network: chainEntry.network,
+    rpcEnvVar: rpcEnvVarFor(args.env, chainEntry),
+    expectedChainId: loaded.expectedChainId,
+    override: args.rpc,
+  });
   const client = makeClient(rpc);
 
   let chainId: number;
@@ -185,6 +201,7 @@ async function main(): Promise<number> {
   const meta: RunMeta = {
     env: args.env,
     chain: args.chain,
+    network: chainEntry.network,
     chainId,
     rpcUrlMasked: rpc.masked,
     blockNumber,

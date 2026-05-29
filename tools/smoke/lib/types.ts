@@ -62,6 +62,8 @@ export interface CheckResult {
 export interface RunMeta {
   env: Env;
   chain: ChainKind;
+  /** Network label from tools/smoke/networks.json (e.g. "arbitrum", "ethereum"). */
+  network: string;
   chainId: number;
   rpcUrlMasked: string;
   blockNumber: bigint;

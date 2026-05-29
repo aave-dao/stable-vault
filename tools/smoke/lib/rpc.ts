@@ -1,9 +1,11 @@
-// Resolve the RPC URL for an (env, chain) tuple and build a viem public client
+// Resolve the RPC URL for a (env, chain) pair and build a viem public client
 // tuned for ~200 reads against a single endpoint via multicall3 batching.
 //
-// RPC URLs come from env vars (SMOKE_RPC_<ENV>_<CHAIN>) or --rpc <url> CLI override.
-// We never log the full URL — only the host portion — so secrets in URLs don't
-// leak into stdout or the JSON report.
+// RPC URLs come from env vars (default convention `SMOKE_RPC_<ENV>_<NETWORK>`,
+// e.g. `SMOKE_RPC_STAGING_ARBITRUM`; per-chain `rpcEnvVar` override in
+// tools/smoke/networks.json) or `--rpc <url>` CLI override. We never log the
+// full URL — only the host portion — so secrets in URLs don't leak into stdout
+// or the JSON report.
 
 import { createPublicClient, http, type Address, type PublicClient } from "viem";
 
@@ -15,19 +17,39 @@ export interface RpcConfig {
   /** Masked form safe to log: scheme + host only, no path or query. */
   masked: string;
   chainKind: ChainKind;
+  /** Network label from networks.json (lowercase: "arbitrum", "ethereum", …). */
+  network: string;
   env: Env;
   /** Expected chain id from JSONC config. Used to bind the viem client to a chain definition. */
   expectedChainId: number;
 }
 
-export function resolveRpc(env: Env, chain: ChainKind, expectedChainId: number, override?: string): RpcConfig {
-  const url = override ?? process.env[`SMOKE_RPC_${env.toUpperCase()}_${chain.toUpperCase()}`] ?? "";
+export interface ResolveRpcArgs {
+  env: Env;
+  kind: ChainKind;
+  network: string;
+  /** Env var name to look up when `override` is not set. */
+  rpcEnvVar: string;
+  expectedChainId: number;
+  /** Explicit --rpc CLI override; bypasses env var lookup. */
+  override?: string;
+}
+
+export function resolveRpc(args: ResolveRpcArgs): RpcConfig {
+  const url = args.override ?? process.env[args.rpcEnvVar] ?? "";
   if (!url) {
     throw new Error(
-      `No RPC URL configured. Set SMOKE_RPC_${env.toUpperCase()}_${chain.toUpperCase()} or pass --rpc <url>.`,
+      `No RPC URL configured. Set ${args.rpcEnvVar} or pass --rpc <url>.`,
     );
   }
-  return { url, masked: maskUrl(url), chainKind: chain, env, expectedChainId };
+  return {
+    url,
+    masked: maskUrl(url),
+    chainKind: args.kind,
+    network: args.network,
+    env: args.env,
+    expectedChainId: args.expectedChainId,
+  };
 }
 
 export function makeClient(rpc: RpcConfig): PublicClient {

@@ -3,7 +3,7 @@
 //   { "<Name>": { "address": "0x…", "saltSeed": "<seed-or-empty>" }, … "aTokenVaults": [...] }
 // Implementation entries use the "::Implementation" suffix on the same JSON object.
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { getAddress, keccak256, toHex, type Address, type Hex } from "viem";
 
@@ -19,13 +19,20 @@ interface RawATokenVault {
   assetSymbol: string;
 }
 
-export function artefactPath(env: Env, chain: ChainKind, repoRoot: string): string {
-  // Matches deploymentOutputPath from config/deployment-config.<env>.jsonc.
-  return resolve(repoRoot, `deployments/${env}/v1/${chain}.json`);
+/**
+ * Resolve the deployment artefact path. Prefers `deployments/<env>/v1/<network>.json`
+ * when present (forward-compatible with multi-EC deploys writing per-network
+ * artefacts), falling back to `deployments/<env>/v1/<kind>.json` (today's
+ * single-EC `earning.json` / `accounting.json` layout).
+ */
+export function artefactPath(env: Env, kind: ChainKind, network: string, repoRoot: string): string {
+  const networkPath = resolve(repoRoot, `deployments/${env}/v1/${network}.json`);
+  if (existsSync(networkPath)) return networkPath;
+  return resolve(repoRoot, `deployments/${env}/v1/${kind}.json`);
 }
 
-export function loadArtefact(env: Env, chain: ChainKind, repoRoot: string): DeploymentArtefact {
-  const path = artefactPath(env, chain, repoRoot);
+export function loadArtefact(env: Env, kind: ChainKind, network: string, repoRoot: string): DeploymentArtefact {
+  const path = artefactPath(env, kind, network, repoRoot);
   const raw = readFileSync(path, "utf8");
   const json = JSON.parse(raw) as Record<string, unknown>;
 

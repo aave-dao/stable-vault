@@ -30,18 +30,20 @@ yarn smoke:prod         # runs accounting + earning + ... (mainnet RPCs)
 
 The list of chains per env lives in [`networks.json`](./networks.json) — adding a new earning chain is one entry there plus one env var.
 
-RPC URLs are read from environment variables, one per `(env, chain-kind)` pair:
+RPC URLs are read from environment variables, one per `(env, network)` pair. The convention is `SMOKE_RPC_<ENV>_<NETWORK_UPPER>` — the network label comes from `networks.json`:
 
 ```sh
-SMOKE_RPC_STAGING_ACCOUNTING=<arb-vnet-rpc>
-SMOKE_RPC_STAGING_EARNING=<eth-vnet-rpc>
+SMOKE_RPC_STAGING_ARBITRUM=<arb-vnet-rpc>
+SMOKE_RPC_STAGING_ETHEREUM=<eth-vnet-rpc>
 
-SMOKE_RPC_PREPROD_ACCOUNTING=<arb-mainnet-rpc>
-SMOKE_RPC_PREPROD_EARNING=<eth-mainnet-rpc>
+SMOKE_RPC_PREPROD_ARBITRUM=<arb-mainnet-rpc>
+SMOKE_RPC_PREPROD_ETHEREUM=<eth-mainnet-rpc>
 
-SMOKE_RPC_PROD_ACCOUNTING=<arb-mainnet-rpc>
-SMOKE_RPC_PROD_EARNING=<eth-mainnet-rpc>
+SMOKE_RPC_PROD_ARBITRUM=<arb-mainnet-rpc>
+SMOKE_RPC_PROD_ETHEREUM=<eth-mainnet-rpc>
 ```
+
+Add a new earning chain (e.g. Base) by appending one entry to `networks.json` and setting `SMOKE_RPC_<ENV>_BASE` for each env. If you need a non-conventional env-var name, set `rpcEnvVar` on that chain entry in `networks.json`.
 
 Easiest setup: copy `.env.example` → `.env` at the repo root, fill the values, and the smoke scripts will load it automatically (via `tsx --env-file-if-exists=.env`).
 
@@ -52,6 +54,13 @@ yarn smoke:staging:accounting
 yarn smoke:staging:earning
 yarn smoke:preprod:accounting
 # … and the matching :earning + :prod:* variants
+```
+
+When an env has multiple chains of the same kind (e.g. two earning chains), add `--network <name>` to disambiguate:
+
+```sh
+tsx tools/smoke/run.ts --env staging --chain earning --network ethereum
+tsx tools/smoke/run.ts --env staging --chain earning --network base
 ```
 
 Or pass `--rpc` inline if you don't want to set an env var:

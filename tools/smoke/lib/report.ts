@@ -22,7 +22,7 @@ export function buildReport(meta: RunMeta, results: CheckResult[], durationMs: n
 
 export function writeReport(report: SmokeReport, repoRoot: string): string {
   const ts = report.meta.startedAt.replace(/[:.]/g, "-");
-  const filename = `${report.meta.env}-${report.meta.chain}-${ts}.json`;
+  const filename = `${report.meta.env}-${report.meta.chain}-${report.meta.network}-${ts}.json`;
   const outDir = join(repoRoot, "tools/smoke/output");
   const path = join(outDir, filename);
   mkdirSync(dirname(path), { recursive: true });

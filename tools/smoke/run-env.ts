@@ -13,27 +13,11 @@
 //   --summary | --quiet | --json | --strict | --no-live-probes
 
 import { spawn } from "node:child_process";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 
-import { parse as parseJsonc } from "jsonc-parser";
-
-import { ENVS, EXIT_CODES, type ChainKind, type Env } from "./lib/types.js";
+import { loadNetworks, rpcEnvVarFor, type ChainEntry } from "./lib/networks.js";
+import { ENVS, EXIT_CODES, type Env } from "./lib/types.js";
 
 const REPO_ROOT = process.cwd();
-const NETWORKS_PATH = resolve(REPO_ROOT, "tools/smoke/networks.json");
-
-interface NetworkChain {
-  kind: ChainKind;
-  network: string;
-}
-
-interface NetworkEnv {
-  rpcSource: "vnet" | "mainnet";
-  chains: NetworkChain[];
-}
-
-type NetworksFile = Record<string, NetworkEnv>;
 
 interface ParsedArgs {
   env: Env;
@@ -93,13 +77,8 @@ function printHelp(): void {
   );
 }
 
-function loadNetworks(): NetworksFile {
-  const raw = readFileSync(NETWORKS_PATH, "utf8");
-  return parseJsonc(raw) as NetworksFile;
-}
-
 interface ChainOutcome {
-  kind: ChainKind;
+  kind: string;
   network: string;
   exitCode: number;
   stdout: string;
@@ -107,8 +86,25 @@ interface ChainOutcome {
   durationMs: number;
 }
 
-function runChain(env: Env, chain: NetworkChain, passthrough: string[]): Promise<ChainOutcome> {
-  const args = ["tools/smoke/run.ts", "--env", env, "--chain", chain.kind, ...passthrough];
+function runChain(env: Env, chain: ChainEntry, passthrough: string[]): Promise<ChainOutcome> {
+  // Resolve the RPC URL centrally (so multi-EC chains in the same env don't collide
+  // on a single SMOKE_RPC_<ENV>_<KIND> variable). Pass it through as --rpc so the
+  // subprocess doesn't need its own networks.json lookup.
+  const envVar = rpcEnvVarFor(env, chain);
+  const url = process.env[envVar];
+  const rpcArgs = url ? ["--rpc", url] : [];
+
+  const args = [
+    "tools/smoke/run.ts",
+    "--env",
+    env,
+    "--chain",
+    chain.kind,
+    "--network",
+    chain.network,
+    ...rpcArgs,
+    ...passthrough,
+  ];
   const started = Date.now();
 
   return new Promise((resolveOutcome) => {
@@ -154,7 +150,7 @@ function banner(label: string): string {
 
 async function main(): Promise<number> {
   const args = parseArgs(process.argv.slice(2));
-  const networks = loadNetworks();
+  const networks = loadNetworks(REPO_ROOT);
   const envEntry = networks[args.env];
   if (!envEntry) {
     process.stderr.write(`networks.json: no entry for env "${args.env}"\n`);
