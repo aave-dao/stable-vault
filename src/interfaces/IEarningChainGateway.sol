@@ -50,7 +50,7 @@ interface IEarningChainGateway is IChainGateway {
         address bridgeAdapter,
         uint256 payloadExecutionGasLimit,
         bytes calldata bridgeAdapterData,
-        bytes memory policyData
+        bytes calldata policyData
     ) external payable returns (uint256);
 
     /// @notice The aggregated balance of the Earning Chain.

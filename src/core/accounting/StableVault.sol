@@ -457,7 +457,7 @@ contract StableVault is
         address assetOut,
         uint256 minAmountOut,
         uint256 iouAmountRay,
-        bytes memory policyData
+        bytes calldata policyData
     ) external virtual override nonReentrant assertingTransferHelperBalanceFor(assetOut) {
         require(user == msg.sender, OnlyUser());
         require(iouAmountRay > 0, Errors.ZeroAmount());
@@ -1018,7 +1018,7 @@ contract StableVault is
         address user,
         address assetOut,
         uint256 iouAmountRay,
-        bytes memory policyData
+        bytes calldata policyData
     ) internal returns (uint256) {
         address policy = IPolicyRegistry(POLICY_REGISTRY).getPolicy(WITHDRAWAL_EXECUTION_POLICY_ID);
         if (policy == address(0)) {
