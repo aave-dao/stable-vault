@@ -11,6 +11,7 @@ import {
 import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
 import {IDepositPolicy} from "src/interfaces/IDepositPolicy.sol";
@@ -900,7 +901,9 @@ contract StableVault is
             return 0;
         }
         // Round down the user balance, so that the rounding is in favor of the protocol.
-        return shares.rayMulDown(_previewSubVaultConversionRate($storage().positions[user].subVaultId));
+        uint256 balanceRay = shares.rayMulDown(_previewSubVaultConversionRate($storage().positions[user].subVaultId));
+        // Rounding can make the share-based balance be slightly lower. Never report under the users' original deposit.
+        return Math.max(balanceRay, $storage().positions[user].originalDepositRay);
     }
 
     function _getActiveSubVaultsObligations() internal view returns (uint256) {
@@ -912,7 +915,9 @@ contract StableVault is
             activeSubVaultsObligations += $storage().subVaultById[subVaultId].totalShares
             .rayMulUp(_previewSubVaultConversionRate(subVaultId));
         }
-        return activeSubVaultsObligations;
+        // Rounding can make the share-based total obligations slightly lower.
+        // Never report less than the total of users' original deposits.
+        return Math.max(activeSubVaultsObligations, $storage().globalOriginalDepositsRay);
     }
 
     function _getVaultObligations() internal view returns (uint256) {
