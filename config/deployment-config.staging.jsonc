@@ -98,7 +98,7 @@
       "minRedemptionCapacityRay": "0",
       "minRedemptionRefillRateRay": "0"
     },
-    "deploymentOutputPath": "deployments/vnet/v2/earning.json",
+    "deploymentOutputPath": "deployments/staging/earning.json",
     "minBurnIouTokenGasLimit": "120000"
   },
   "accountingChain": {
@@ -169,6 +169,6 @@
       "minRedemptionCapacityRay": "0",
       "minRedemptionRefillRateRay": "0"
     },
-    "deploymentOutputPath": "deployments/vnet/v2/accounting.json"
+    "deploymentOutputPath": "deployments/staging/accounting.json"
   }
 }

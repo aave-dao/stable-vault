@@ -98,7 +98,7 @@
       "minRedemptionCapacityRay": "0",
       "minRedemptionRefillRateRay": "0"
     },
-    "deploymentOutputPath": "deployments/prod/v1/earning.json",
+    "deploymentOutputPath": "deployments/prod/earning.json",
     "minBurnIouTokenGasLimit": "120000"
   },
   "accountingChain": {
@@ -169,6 +169,6 @@
       "minRedemptionCapacityRay": "0",
       "minRedemptionRefillRateRay": "0"
     },
-    "deploymentOutputPath": "deployments/prod/v1/accounting.json"
+    "deploymentOutputPath": "deployments/prod/accounting.json"
   }
 }
