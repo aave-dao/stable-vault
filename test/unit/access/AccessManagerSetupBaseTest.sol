@@ -86,6 +86,25 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         return false;
     }
 
+    function _secondaryAdminRateLimitRoles() internal view returns (RolesConfig.Role[] memory) {
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](12);
+
+        roles[0] = RolesConfig.getRole__raiseDepositCapacity();
+        roles[1] = RolesConfig.getRole__raiseDepositRefillRate();
+        roles[2] = RolesConfig.getRole__raiseBridgingCapacity();
+        roles[3] = RolesConfig.getRole__raiseBridgingRefillRate();
+        roles[4] = RolesConfig.getRole__raiseRedemptionCapacity();
+        roles[5] = RolesConfig.getRole__raiseRedemptionRefillRate();
+        roles[6] = RolesConfig.getRole__raisePullCapPerTx();
+        roles[7] = RolesConfig.getRole__raiseWindowCap();
+        roles[8] = RolesConfig.getRole__lowerWindowSeconds();
+        roles[9] = RolesConfig.getRole__setMaxSlippageBps();
+        roles[10] = RolesConfig.getRole__setOverrideMaxSlippageBps();
+        roles[11] = RolesConfig.getRole__sweepSlippageCoverageVault();
+
+        return roles;
+    }
+
     function _assertProfileHasExactlyTheseRoles(address profile, uint64[] memory expectedRoleIds) internal view {
         uint64[] memory allRoleIds = _getAllRoleIds();
         for (uint256 i = 0; i < allRoleIds.length; i++) {
@@ -179,6 +198,33 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
             if (!allRoles[i].hasCriticalRisk) {
                 _assertProfileRoleDelay(_getProfile__SecondaryAdmin(), allRoles[i].roleId, allRoles[i].delay);
             }
+        }
+    }
+
+    function test_rateLimitRoles_areGrantedToSecondaryAdminWithAdminGuardians() public view {
+        RolesConfig.Role[] memory roles = _secondaryAdminRateLimitRoles();
+        IAccessManager accessManager = IAccessManager(_accessManager());
+        address mainAdmin = _getProfile__MainAdmin();
+        address secondaryAdmin = _getProfile__SecondaryAdmin();
+
+        for (uint256 i = 0; i < roles.length; i++) {
+            string memory selector = vm.toString(bytes32(roles[i].selector));
+
+            assertFalse(roles[i].hasCriticalRisk, string.concat("role should be secondary-admin eligible ", selector));
+            assertEq(roles[i].delay, HIGH_DELAY, string.concat("role should keep HIGH_DELAY ", selector));
+            assertEq(
+                roles[i].guardianRoleId,
+                RolesConfig.ADMIN_ROLE_GUARDIAN_ROLE,
+                string.concat("role should keep admin guardian ", selector)
+            );
+
+            (bool mainHas, uint32 mainDelay) = accessManager.hasRole(roles[i].roleId, mainAdmin);
+            assertTrue(mainHas, string.concat("MainAdmin should have role ", selector));
+            assertEq(mainDelay, HIGH_DELAY, string.concat("MainAdmin delay mismatch ", selector));
+
+            (bool secondaryHas, uint32 secondaryDelay) = accessManager.hasRole(roles[i].roleId, secondaryAdmin);
+            assertTrue(secondaryHas, string.concat("SecondaryAdmin should have role ", selector));
+            assertEq(secondaryDelay, HIGH_DELAY, string.concat("SecondaryAdmin delay mismatch ", selector));
         }
     }
 
@@ -654,6 +700,50 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         _assertCanCall(admin, _proxyAdmin(), ProxyAdmin.upgradeAndCall.selector, false, 0);
     }
 
+    function test_canCall_secondaryAdmin_rateLimitRoles() public view {
+        address admin = _getProfile__SecondaryAdmin();
+
+        address fundsBridgingPolicy = getFundsBridgingPolicyAddress(_deployer());
+        _assertCanCall(
+            admin, fundsBridgingPolicy, FundsBridgingPolicy.raiseBridgingCapacity.selector, false, HIGH_DELAY
+        );
+        _assertCanCall(
+            admin, fundsBridgingPolicy, FundsBridgingPolicy.raiseBridgingRefillRate.selector, false, HIGH_DELAY
+        );
+
+        address withdrawalExecutionPolicy = getWithdrawalExecutionPolicyAddress(_deployer());
+        _assertCanCall(
+            admin,
+            withdrawalExecutionPolicy,
+            WithdrawalExecutionPolicy.raiseRedemptionCapacity.selector,
+            false,
+            HIGH_DELAY
+        );
+        _assertCanCall(
+            admin,
+            withdrawalExecutionPolicy,
+            WithdrawalExecutionPolicy.raiseRedemptionRefillRate.selector,
+            false,
+            HIGH_DELAY
+        );
+
+        address slippageCoverageVault = getSlippageCoverageVaultAddress(_deployer());
+        _assertCanCall(
+            admin, slippageCoverageVault, SlippageCoverageVault.raisePullCapPerTx.selector, false, HIGH_DELAY
+        );
+        _assertCanCall(admin, slippageCoverageVault, SlippageCoverageVault.raiseWindowCap.selector, false, HIGH_DELAY);
+        _assertCanCall(
+            admin, slippageCoverageVault, SlippageCoverageVault.lowerWindowSeconds.selector, false, HIGH_DELAY
+        );
+        _assertCanCall(
+            admin, slippageCoverageVault, SlippageCoverageVault.setMaxSlippageBps.selector, false, HIGH_DELAY
+        );
+        _assertCanCall(
+            admin, slippageCoverageVault, SlippageCoverageVault.setOverrideMaxSlippageBps.selector, false, HIGH_DELAY
+        );
+        _assertCanCall(admin, slippageCoverageVault, SlippageCoverageVault.sweep.selector, false, HIGH_DELAY);
+    }
+
     function test_canCall_rebalancer() public view {
         address rebalancer = _getProfile__Rebalancer();
 
@@ -974,6 +1064,26 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         assertEq(accessManager.getSchedule(operationId), 0, "Operation should be canceled");
     }
 
+    function test_mainAdminGuardian_canCancelSecondaryAdminRateLimitOperation() public {
+        IAccessManager accessManager = IAccessManager(_accessManager());
+        address mainAdmin = _getProfile__MainAdmin();
+        address secondaryAdmin = _getProfile__SecondaryAdmin();
+        address target = getSlippageCoverageVaultAddress(_deployer());
+
+        bytes memory callData = abi.encodeCall(SlippageCoverageVault.raisePullCapPerTx, (makeAddr("asset"), uint256(1)));
+        bytes32 operationId = accessManager.hashOperation(secondaryAdmin, target, callData);
+
+        vm.prank(secondaryAdmin);
+        accessManager.schedule(target, callData, 0);
+
+        assertTrue(accessManager.getSchedule(operationId) > 0, "Operation should be scheduled");
+
+        vm.prank(mainAdmin);
+        accessManager.cancel(secondaryAdmin, target, callData);
+
+        assertEq(accessManager.getSchedule(operationId), 0, "Operation should be canceled");
+    }
+
     ////// SecondaryAdmin cannot cancel admin-tier operations //////
 
     function test_secondaryAdmin_cannotCancelAdminTierOperation() public {
@@ -1107,6 +1217,34 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         accessManager.grantRole(role.roleId, newAddr, 0);
 
         // SecondaryAdmin tries revokeRole -> reverts
+        vm.prank(secondary);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessManager.AccessManagerUnauthorizedAccount.selector,
+                secondary,
+                RolesConfig.ADMIN_ROLE_GUARDIAN_ROLE
+            )
+        );
+        accessManager.revokeRole(role.roleId, _getProfile__MainAdmin());
+    }
+
+    function test_secondaryAdmin_cannotGrantOrRevokeRateLimitRoles() public {
+        IAccessManager accessManager = IAccessManager(_accessManager());
+        address secondary = _getProfile__SecondaryAdmin();
+        address newAddr = makeAddr("SECONDARY_RATE_LIMIT_TEST");
+
+        RolesConfig.Role memory role = RolesConfig.getRole__raisePullCapPerTx();
+
+        vm.prank(secondary);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessManager.AccessManagerUnauthorizedAccount.selector,
+                secondary,
+                RolesConfig.ADMIN_ROLE_GUARDIAN_ROLE
+            )
+        );
+        accessManager.grantRole(role.roleId, newAddr, role.delay);
+
         vm.prank(secondary);
         vm.expectRevert(
             abi.encodeWithSelector(
