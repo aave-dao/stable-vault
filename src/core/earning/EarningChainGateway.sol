@@ -100,6 +100,10 @@ contract EarningChainGateway is
     }
 
     /// @inheritdoc IEarningChainGateway
+    /// @dev `msg.sender` pays the bridge fee. ERC-20 fee approvals must be granted to the `bridgeAdapter` specified in
+    /// this call, and the approved amount should be limited to the expected fee rather than unlimited: the adapter
+    /// pulls the quoted fee with no per-transaction bound, so a limited allowance caps the worst case if a fee quoter
+    /// returns an over-stated fee.
     function exchangeIouTokens(
         uint256 iouTokenAmountRay,
         address assetOut,

@@ -96,6 +96,10 @@ contract IouTokenManager is ReentrancyGuardTransientUpgradeable, IIouTokenManage
     /// @dev IOUs should be bridged via bridges which require finalization on the source chain. If IOUs are bridged and
     /// exchanged for assets on a destination, but the source chain reorgs, then a user would keep their IOUs and the
     /// assets withdrawn on the destination chain.
+    /// @notice `msg.sender` pays the bridge fee. ERC-20 fee approvals must be granted to the `bridgeAdapter` specified
+    /// in this call, and the approved amount should be limited to the expected fee rather than unlimited: the adapter
+    /// pulls the quoted fee with no per-transaction bound, so a limited allowance caps the worst case if a fee quoter
+    /// returns an over-stated fee.
     function bridgeTokens(
         uint256 destinationChainId,
         address iouTokenRecipient,

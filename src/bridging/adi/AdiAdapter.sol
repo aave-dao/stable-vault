@@ -129,6 +129,9 @@ contract AdiAdapter is BaseBridgeAdapter, RescuableNative, RescuableToken, IAdiB
     }
 
     /// @inheritdoc IAdiBridgeAdapter
+    /// @notice `msg.sender` funds the retry. ERC-20 fee approvals must be granted to this adapter contract, with each
+    /// fee token's allowance limited to the expected fee rather than unlimited: the adapter pulls the quoted fees with
+    /// no per-transaction bound, so limited allowances cap the worst case if a fee quoter returns over-stated fees.
     function retryTransaction(
         bytes calldata encodedTransaction,
         uint256 gasLimit,
@@ -165,6 +168,9 @@ contract AdiAdapter is BaseBridgeAdapter, RescuableNative, RescuableToken, IAdiB
     }
 
     /// @inheritdoc IAdiBridgeAdapter
+    /// @notice `msg.sender` funds the retry. ERC-20 fee approvals must be granted to this adapter contract, with each
+    /// fee token's allowance limited to the expected fee rather than unlimited: the adapter pulls the quoted fees with
+    /// no per-transaction bound, so limited allowances cap the worst case if a fee quoter returns over-stated fees.
     function retryEnvelope(Envelope calldata envelope, uint256 gasLimit)
         external
         payable
