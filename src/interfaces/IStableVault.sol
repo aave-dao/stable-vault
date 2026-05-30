@@ -182,7 +182,7 @@ interface IStableVault {
         address assetOut,
         uint256 minAmountOut,
         uint256 iouAmountRay,
-        bytes memory policyData
+        bytes calldata policyData
     ) external;
 
     /// @notice Getter for the default sub-vault.

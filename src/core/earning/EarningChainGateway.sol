@@ -108,7 +108,7 @@ contract EarningChainGateway is
         address bridgeAdapter,
         uint256 payloadExecutionGasLimit,
         bytes calldata bridgeAdapterData,
-        bytes memory policyData
+        bytes calldata policyData
     ) external payable virtual override nonReentrant assertingTransferHelperBalanceFor(assetOut) returns (uint256) {
         require(iouTokenAmountRay > 0, Errors.ZeroAmount());
         // An insufficient payload gas limit would cause the BURN_IOU_TOKEN message to be dropped while
@@ -220,7 +220,7 @@ contract EarningChainGateway is
         uint256 iouTokenAmountRay,
         address assetOut,
         uint256 minAmountOut,
-        bytes memory policyData
+        bytes calldata policyData
     ) private returns (uint256) {
         uint256 amountOutRay = _applyWithdrawalExecutionPolicy(msg.sender, assetOut, iouTokenAmountRay, policyData);
         // Note: The `rayToAssetDecimals` conversion truncates, so the user may burn slightly more IOUs than the
@@ -237,7 +237,7 @@ contract EarningChainGateway is
         address user,
         address assetOut,
         uint256 iouAmountRay,
-        bytes memory policyData
+        bytes calldata policyData
     ) private returns (uint256) {
         address policy = IPolicyRegistry(POLICY_REGISTRY).getPolicy(WITHDRAWAL_EXECUTION_POLICY_ID);
         if (policy == address(0)) {
