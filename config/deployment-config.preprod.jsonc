@@ -163,8 +163,8 @@
     },
     "withdrawalExecutionPolicy": {
       "redemptionLimit": {
-        "capacityRay": "1000000000000000000000000000000000", // $100,000
-        "refillRateRay": "115740740740740740740740740740" // $1,000,000/day
+        "capacityRay": "100000000000000000000000000000000", // $100,000
+        "refillRateRay": "11574074074074074074074074074" // $1,000,000/day
       },
       "minRedemptionCapacityRay": "0",
       "minRedemptionRefillRateRay": "0"
