@@ -139,6 +139,14 @@ contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, Ac
         _assertCanCall(stableVaultManager, getAllocatorAddress(_deployer()), IAllocator.rebalance.selector, false, 0);
     }
 
+    function test_canCall_secondaryAdmin_depositPolicyRaiseRoles() public view {
+        address secondaryAdmin = _getProfile__SecondaryAdmin();
+        address depositPolicy = getDepositPolicyAddress(_deployer());
+
+        _assertCanCall(secondaryAdmin, depositPolicy, DepositPolicy.raiseDepositCapacity.selector, false, HIGH_DELAY);
+        _assertCanCall(secondaryAdmin, depositPolicy, DepositPolicy.raiseDepositRefillRate.selector, false, HIGH_DELAY);
+    }
+
     function test_stableVaultManagerProfile_hasTheExpectedRoles() public view {
         uint64[] memory expected = new uint64[](4);
         expected[0] = RolesConfig.getRole__setUserRate().roleId;
