@@ -84,6 +84,7 @@ Withdrawals are a two-step process designed to ensure liquidity management and p
     - If bridging from the **Accounting Chain** to an **Earning Chain**, IOUs are locked in the `IouTokenManager` on the source chain, and an equivalent amount is minted on the destination chain.
     - If bridging from an **Earning Chain** to the **Accounting Chain**, IOUs are burned on the source chain, and released from the `IouTokenManager` on the destination chain. IOUs can also be bridged from one Earning Chain to another.
     - This allows users to move their claim on assets to the chain where they wish to withdraw or utilize the IOUs. The reason for this design is to allow users to withdraw even if managers are offline and do not repatriate funds back to the Accounting Chain.
+    - **Bridge fee approvals**: The bridge fee is paid by the caller (`msg.sender`). When the fee is paid in an ERC-20 token, the caller must approve the **specific `bridgeAdapter` passed in the call** to pull the fee. The adapter pulls the quoted fee with no per-transaction cap, so callers should **limit the approval to the expected fee amount** rather than granting an unlimited allowance. This bounds the worst case if a bridge fee quoter ever returns an over-stated fee. Native-token fees are bounded by the `msg.value` sent and require no approval.
 
 3. **Execute Withdrawal**:
    IOUs can be exchanged for assets on either the Accounting Chain or Earning Chains.
@@ -97,6 +98,7 @@ Withdrawals are a two-step process designed to ensure liquidity management and p
      - **Contract**: `EarningChainGateway`
      - **Function**: `exchangeIouTokens(...)`
      - **Process**: IOUs are burned locally. The `WithdrawalExecutionPolicy` enforces the protocol's policies and operational costs associated with the withdrawal. Assets are withdrawn from the local `Allocator`. A cross-chain message is sent to the Accounting Chain to burn the corresponding locked IOUs. Assets are transferred to the user from the `TransferHelper`.
+     - **Bridge fee approvals**: This call sends a cross-chain message, so the same fee-approval guidance as [Bridging IOUs](#withdrawals) applies. The caller (`msg.sender`) pays the bridge fee; when it is paid in an ERC-20 token, approve the **specific `bridgeAdapter` passed in the call** and **limit the approval to the expected fee amount** rather than granting an unlimited allowance. Native-token fees are bounded by the `msg.value` sent and require no approval.
 
 ## Repository Structure
 

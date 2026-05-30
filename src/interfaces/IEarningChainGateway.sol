@@ -33,6 +33,11 @@ interface IEarningChainGateway is IChainGateway {
     ) external payable;
 
     /// @notice Exchanges IOU tokens for a specific asset and bridges data back to the Accounting Chain.
+    /// @notice The caller (`msg.sender`) pays the bridge fee. When the fee is paid in an ERC-20 token, the caller must
+    /// approve the fee token to the `bridgeAdapter` passed in this call (not any other adapter). The adapter pulls the
+    /// quoted fee with no per-transaction cap, so approvals should be limited to the expected fee amount rather than
+    /// left unlimited; this bounds the worst case if a fee quoter returns an over-stated fee. Native-token fees are
+    /// bounded by `msg.value` and require no approval.
     /// @param iouTokenAmountRay The amount of IOU tokens to exchange.
     /// @param assetOut The asset to exchange the IOU tokens for.
     /// @param minAmountOut The minimum amount of `assetOut` to receive for `iouTokenAmountRay` of IOU tokens.
