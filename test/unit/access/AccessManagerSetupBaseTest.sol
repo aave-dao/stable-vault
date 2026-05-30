@@ -224,7 +224,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
     }
 
     function test_disablerProfile_hasTheExpectedRoles() public view {
-        uint64[] memory expected = new uint64[](20);
+        uint64[] memory expected = new uint64[](18);
         // Allocator (defensive)
         expected[0] = RolesConfig.getRole__rebalance().roleId;
         expected[1] = RolesConfig.getRole__removeStrategy().roleId;
@@ -240,19 +240,17 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         expected[9] = RolesConfig.getRole__removeFundsBridgeAdapter().roleId;
         // WithdrawalExecutionPolicy
         expected[10] = RolesConfig.getRole__removeSigner().roleId;
-        expected[11] = RolesConfig.getRole__lowerRedemptionCapacity().roleId;
-        expected[12] = RolesConfig.getRole__lowerRedemptionRefillRate().roleId;
         // SlippageCoverageVault
         // raiseWindowSeconds is tightening (longer window = slower rate), even though the prefix says raise.
-        expected[13] = RolesConfig.getRole__lowerPullCapPerTx().roleId;
-        expected[14] = RolesConfig.getRole__lowerWindowCap().roleId;
-        expected[15] = RolesConfig.getRole__raiseWindowSeconds().roleId;
+        expected[11] = RolesConfig.getRole__lowerPullCapPerTx().roleId;
+        expected[12] = RolesConfig.getRole__lowerWindowCap().roleId;
+        expected[13] = RolesConfig.getRole__raiseWindowSeconds().roleId;
         // DepositPolicy
-        expected[16] = RolesConfig.getRole__lowerDepositCapacity().roleId;
-        expected[17] = RolesConfig.getRole__lowerDepositRefillRate().roleId;
+        expected[14] = RolesConfig.getRole__lowerDepositCapacity().roleId;
+        expected[15] = RolesConfig.getRole__lowerDepositRefillRate().roleId;
         // FundsBridgingPolicy
-        expected[18] = RolesConfig.getRole__lowerBridgingCapacity().roleId;
-        expected[19] = RolesConfig.getRole__lowerBridgingRefillRate().roleId;
+        expected[16] = RolesConfig.getRole__lowerBridgingCapacity().roleId;
+        expected[17] = RolesConfig.getRole__lowerBridgingRefillRate().roleId;
         _assertProfileHasExactlyTheseRoles(_getProfile__Disabler(), expected);
 
         for (uint256 i = 0; i < expected.length; i++) {
@@ -692,6 +690,20 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         _assertCanCall(disabler, getAllocatorAddress(_deployer()), IAllocator.addStrategy.selector, false, 0);
         _assertCanCall(disabler, getAllocatorAddress(_deployer()), IAllocator.topUp.selector, false, 0);
         _assertCanCall(disabler, getAllocatorAddress(_deployer()), IAllocator.trustStrategy.selector, false, 0);
+        _assertCanCall(
+            disabler,
+            getWithdrawalExecutionPolicyAddress(_deployer()),
+            WithdrawalExecutionPolicy.lowerRedemptionCapacity.selector,
+            false,
+            0
+        );
+        _assertCanCall(
+            disabler,
+            getWithdrawalExecutionPolicyAddress(_deployer()),
+            WithdrawalExecutionPolicy.lowerRedemptionRefillRate.selector,
+            false,
+            0
+        );
     }
 
     function test_canCall_withdrawalPolicyManager() public view {
