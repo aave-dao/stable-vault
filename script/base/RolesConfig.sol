@@ -853,7 +853,7 @@ abstract contract RolesConfig is DeploymentConfig {
             selector: selector,
             delay: HIGH_DELAY,
             guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
-            hasCriticalRisk: true
+            hasCriticalRisk: false
         });
     }
 
@@ -866,7 +866,7 @@ abstract contract RolesConfig is DeploymentConfig {
             selector: selector,
             delay: HIGH_DELAY,
             guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
-            hasCriticalRisk: true
+            hasCriticalRisk: false
         });
     }
 
@@ -905,7 +905,7 @@ abstract contract RolesConfig is DeploymentConfig {
             selector: selector,
             delay: HIGH_DELAY,
             guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
-            hasCriticalRisk: true
+            hasCriticalRisk: false
         });
     }
 
@@ -918,7 +918,7 @@ abstract contract RolesConfig is DeploymentConfig {
             selector: selector,
             delay: HIGH_DELAY,
             guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
-            hasCriticalRisk: true
+            hasCriticalRisk: false
         });
     }
 
@@ -957,7 +957,7 @@ abstract contract RolesConfig is DeploymentConfig {
             selector: selector,
             delay: HIGH_DELAY,
             guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
-            hasCriticalRisk: true
+            hasCriticalRisk: false
         });
     }
 
@@ -970,7 +970,7 @@ abstract contract RolesConfig is DeploymentConfig {
             selector: selector,
             delay: HIGH_DELAY,
             guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
-            hasCriticalRisk: true
+            hasCriticalRisk: false
         });
     }
 
@@ -1061,7 +1061,7 @@ abstract contract RolesConfig is DeploymentConfig {
             selector: selector,
             delay: HIGH_DELAY,
             guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
-            hasCriticalRisk: true
+            hasCriticalRisk: false
         });
     }
 
@@ -1087,7 +1087,7 @@ abstract contract RolesConfig is DeploymentConfig {
             selector: selector,
             delay: HIGH_DELAY,
             guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
-            hasCriticalRisk: true
+            hasCriticalRisk: false
         });
     }
 
@@ -1126,7 +1126,7 @@ abstract contract RolesConfig is DeploymentConfig {
             selector: selector,
             delay: HIGH_DELAY,
             guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
-            hasCriticalRisk: true
+            hasCriticalRisk: false
         });
     }
 
@@ -1139,7 +1139,7 @@ abstract contract RolesConfig is DeploymentConfig {
             selector: selector,
             delay: HIGH_DELAY,
             guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
-            hasCriticalRisk: true
+            hasCriticalRisk: false
         });
     }
 
@@ -1152,7 +1152,7 @@ abstract contract RolesConfig is DeploymentConfig {
             selector: selector,
             delay: HIGH_DELAY,
             guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
-            hasCriticalRisk: true
+            hasCriticalRisk: false
         });
     }
 
@@ -1178,7 +1178,7 @@ abstract contract RolesConfig is DeploymentConfig {
             selector: selector,
             delay: HIGH_DELAY,
             guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
-            hasCriticalRisk: true
+            hasCriticalRisk: false
         });
     }
 

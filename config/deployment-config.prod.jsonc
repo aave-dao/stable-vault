@@ -127,7 +127,7 @@
     "aaveV3PoolAddressesProvider": "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb",
     "useMockBundleFeed": false,
     "useMockSequencerUptimeFeed": false,
-    "chainlinkBundleAggregatorProxy": "0x0000000000000000000000000000000000000000", // TODO: set
+    "chainlinkBundleAggregatorProxy": "0xA8eB7776952b3a86CD01b15563764c4b956E8504",
     "sequencerUptimeFeed": "0xFdB631F5EE196F0ed6FAa767959853A9F217697D",
     "depositPolicy": {
       "perAssetLimits": {
