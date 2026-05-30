@@ -1,6 +1,0 @@
-{
-  "minValidPriceRay": "0.99e27",
-  "criticalDelay": "2 hours",
-  "medDelay": "1 hour",
-  "aTokenVaultImplFlavor": "ATokenVault.sol"
-}
