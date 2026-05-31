@@ -854,7 +854,6 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
                 getIouTokenAddress(_deployer()),
                 getGatewayAddress(_deployer()),
                 _iouTokenManagerVault(),
-                getTransferHelperAddress(_deployer()),
                 _isAccountingChain()
             )
         );
