@@ -373,6 +373,7 @@ function run_forge_tests() {
   # clean checkout never produces it, and the preprod deploy fork tests would fail to read it.
   log "Building contracts"
   forge build
+  mkdir -p "$ROOT_DIR/deployments"
   log "Running Stable Vaults Pigeon fork tests"
   # shellcheck disable=SC2086
   forge test --match-contract "$MATCH_CONTRACT" $FORGE_TEST_ARGS

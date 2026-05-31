@@ -1,0 +1,124 @@
+{
+  "TransferHelper": {
+    "address": "0x698b3752a56a8bcb5abfdb90f1cbcd49f2d044fb",
+    "saltSeed": "aave.stable-vault.TransferHelper"
+  },
+  "AccessManager": {
+    "address": "0x7d025dda645ed82bf318d1c46ac7be23185ab8b4",
+    "saltSeed": "aave.stable-vault.AccessManager"
+  },
+  "AssetRegistry::Implementation": {
+    "address": "0x35c240b8fd5ffd3346dc543ad1d98505355300f4",
+    "saltSeed": ""
+  },
+  "AssetRegistry": {
+    "address": "0x0df9098de4de0815c41dae3b23937ae7fae8d1fe",
+    "saltSeed": "aave.stable-vault.AssetRegistry"
+  },
+  "PolicyRegistry": {
+    "address": "0xf78a3de8aec7e3185495ccf1c57448a0289ec04b",
+    "saltSeed": "aave.stable-vault.PolicyRegistry"
+  },
+  "WithdrawalExecutionPolicy::Implementation": {
+    "address": "0xc976f91c624232d2c0618cf41b48574bb36724f7",
+    "saltSeed": ""
+  },
+  "WithdrawalExecutionPolicy": {
+    "address": "0x501ff3b6dab342c94fc8c798efb8438d937ffeb6",
+    "saltSeed": "aave.stable-vault.WithdrawalExecutionPolicy"
+  },
+  "IouToken": {
+    "address": "0x4852acef76165e89fd38617b83feee7e7969a9be",
+    "saltSeed": "aave.stable-vault.IouToken"
+  },
+  "IouTokenManager::Implementation": {
+    "address": "0x28c6d71a6557c556d5410b3d25a974502adbe584",
+    "saltSeed": ""
+  },
+  "IouTokenManager": {
+    "address": "0xe449fd0d10dc0580a049b0dda5e6ad84edef8241",
+    "saltSeed": "aave.stable-vault.IouTokenManager"
+  },
+  "PriceOracle::Implementation": {
+    "address": "0xde51741a61b13b22d31a02b99b120dd213934abf",
+    "saltSeed": ""
+  },
+  "PriceOracle": {
+    "address": "0x2c9235eef1c7cdf2558b859bf30846ef3c36c312",
+    "saltSeed": "aave.stable-vault.PriceOracle"
+  },
+  "Allocator::Implementation": {
+    "address": "0xd4d79839ad97ef405dddffdf022df7a7090d89ec",
+    "saltSeed": ""
+  },
+  "Allocator": {
+    "address": "0x6b600e5161ad8ce0ef93aef7456ad0e5b3befb87",
+    "saltSeed": "aave.stable-vault.Allocator"
+  },
+  "EarningChainGateway::Implementation": {
+    "address": "0x70ac8a51042e3f65585df9868edccfbde22979dd",
+    "saltSeed": ""
+  },
+  "EarningChainGateway": {
+    "address": "0xed2df650f7fabecf3f56479a37b7654aeadd1b9f",
+    "saltSeed": "aave.stable-vault.Gateway"
+  },
+  "SlippageCoverageVault": {
+    "address": "0x66bf36d135781d4fda3e2740fd218311b8245dd7",
+    "saltSeed": "aave.stable-vault.SlippageCoverageVault"
+  },
+  "Swapper": {
+    "address": "0x95a10afbbfd440d17ddbbe3c813779fefcb4fc2e",
+    "saltSeed": "aave.stable-vault.Swapper"
+  },
+  "CcipAdapter": {
+    "address": "0x34a0cf1328232df2576130aa87bc105b96d66ac2",
+    "saltSeed": "aave.stable-vault.CcipAdapter"
+  },
+  "AdiAdapter": {
+    "address": "0xac5a5261de3f71a23b2f5216d740e86ca090e5bd",
+    "saltSeed": "aave.stable-vault.AdiAdapter"
+  },
+  "EarningChainStateProvider::Implementation": {
+    "address": "0x69ce8a87d68f89ab905a703c8c35b166822e9077",
+    "saltSeed": ""
+  },
+  "EarningChainStateProvider": {
+    "address": "0xca24d661fe478e320c18ad1aa7281f0489f0c23a",
+    "saltSeed": "aave.stable-vault.EarningChainStateProvider"
+  },
+  "FundsBridgingPolicy": {
+    "address": "0x25616017f611a7df2eee9a49fdf9a2ec8cf1fc96",
+    "saltSeed": "aave.stable-vault.FundsBridgingPolicy"
+  },
+  "aTokenVaults": [
+    {
+      "address": "0x7D69438574AbA0B81B88FD45A59E13Cd6357de69",
+      "assetSymbol": "USDC"
+    },
+    {
+      "address": "0x734254ad1aA3D320f74770e8e3267B4F94b3569F",
+      "assetSymbol": "USDT"
+    }
+  ],
+  "ChainlinkPriceOracleAdapter::GHO": {
+    "address": "0x5c6dadee06e30375e2ecacd7d7cb8303ad80a2d5",
+    "saltSeed": "aave.stable-vault.ChainlinkPriceOracleAdapter.0x40d16fc0246ad3160ccc09b8d0d3a2cd28ae6c2f"
+  },
+  "ChainlinkPriceOracleAdapter::USDC": {
+    "address": "0x005be2d82a087c1b38099faef4186e635ebfb6f3",
+    "saltSeed": "aave.stable-vault.ChainlinkPriceOracleAdapter.0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+  },
+  "ChainlinkPriceOracleAdapter::USDT": {
+    "address": "0x4e1c32ca9af7df1797be4d6ac5b50a2ffd9c302a",
+    "saltSeed": "aave.stable-vault.ChainlinkPriceOracleAdapter.0xdac17f958d2ee523a2206206994597c13d831ec7"
+  },
+  "RebalancerMulticall": {
+    "address": "0x170c95e0539cd099e0a315a53a725ae7a78ee034",
+    "saltSeed": "aave.stable-vault.OwnedMulticall.RebalancerProfile"
+  },
+  "DisablerMulticall": {
+    "address": "0x53023407b6ebe20735c903a6a03d1c82a0606705",
+    "saltSeed": "aave.stable-vault.OwnedMulticall.DisablerProfile"
+  }
+}
