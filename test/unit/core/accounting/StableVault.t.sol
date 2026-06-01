@@ -3021,7 +3021,7 @@ contract StableVaultTest is TestWithHelpers {
 
         vm.prank(user);
         vm.expectRevert(Errors.InvalidAmount.selector);
-        stableVault.transfer(recipient, fullAmountRay);
+        assertFalse(stableVault.transfer(recipient, fullAmountRay));
 
         vm.prank(user);
         assertTrue(stableVault.transferAll(recipient));
@@ -3076,7 +3076,7 @@ contract StableVaultTest is TestWithHelpers {
         // InsufficientFunds (the full position moves via transferAll()).
         vm.prank(user);
         vm.expectRevert(Errors.InsufficientFunds.selector);
-        highRateVault.transfer(recipient, partialTransferAmountRay);
+        assertFalse(highRateVault.transfer(recipient, partialTransferAmountRay));
     }
 
     function test_transfer_allowsLargestPartialTransfer_beforeGuaranteedPrincipalDeadZone() public {
@@ -3202,7 +3202,7 @@ contract StableVaultTest is TestWithHelpers {
         // the full position, principal floor included, moves through transferAll() instead.
         vm.prank(user);
         vm.expectRevert(Errors.InsufficientFunds.selector);
-        highRateVault.transfer(recipient, fullTransferAmountRay);
+        assertFalse(highRateVault.transfer(recipient, fullTransferAmountRay));
 
         vm.prank(user);
         assertTrue(highRateVault.transferAll(recipient));
@@ -3261,7 +3261,7 @@ contract StableVaultTest is TestWithHelpers {
         // transferAll().
         vm.prank(user);
         vm.expectRevert(Errors.InsufficientFunds.selector);
-        highRateVault.transfer(recipient, balance);
+        assertFalse(highRateVault.transfer(recipient, balance));
 
         vm.prank(user);
         assertTrue(highRateVault.transferAll(recipient));
