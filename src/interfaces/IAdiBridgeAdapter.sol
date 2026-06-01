@@ -18,6 +18,11 @@ interface IAdiBridgeAdapter is IBridgeAdapter {
     /// @custom:selector 0xe632d197
     error OnlyCrossChainController();
 
+    /// @notice The destination chain has no required forwarding successes configured, so a forward could finalize
+    /// without any a.DI bridge delivering the message.
+    /// @custom:selector 0xbb6ed497
+    error RequiredForwardingSuccessesNotSet();
+
     /// @notice Retries an already forwarded StableVault a.DI transaction using caller-provided funding.
     /// @param encodedTransaction ABI-encoded a.DI transaction to retry.
     /// @param gasLimit Gas limit requested for Gateway payload execution on the destination chain.
