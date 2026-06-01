@@ -366,6 +366,26 @@ contract AdiAdapterTest is TestWithHelpers {
         assertEq(_mockUsdc.balanceOf(address(_mockAdiCrossChainController)), 0);
     }
 
+    function test_publishMessageToChainWithFeePayer_reverts_ifRequiredForwardingSuccessesIsZero() public {
+        uint256 nativeAmount = 1 ether;
+        uint256 feeAmount = 100e6;
+        vm.deal(address(_accountingChainGateway), nativeAmount);
+        _stageFee(feePayer, _mockUsdc, feeAmount);
+        _mockAdiCrossChainController.setNativeFee(nativeAmount);
+        _setQuotedFees(_singleAddress(address(_mockUsdc)), _singleUint256(feeAmount));
+        _mockAdiCrossChainController.setRequiredForwardingSuccesses(0);
+
+        vm.expectRevert(IAdiBridgeAdapter.RequiredForwardingSuccessesNotSet.selector);
+        vm.prank(address(_accountingChainGateway));
+        _accountingChainAdiAdapter.publishDataOnlyMessage{value: nativeAmount}(
+            EARNING_CHAIN_ID, "", feePayer, DEFAULT_GAS_LIMIT, _bridgeAdapterData()
+        );
+
+        assertEq(_mockAdiCrossChainController.forwardMessageCallCount(), 0);
+        assertEq(address(_mockAdiCrossChainController).balance, 0);
+        assertEq(_mockUsdc.balanceOf(address(_mockAdiCrossChainController)), 0);
+    }
+
     function test_publishMessageToChainWithFeePayer_pullsErc20FundingToCrossChainController() public {
         uint256 feeAmount = 100e6;
         _stageFee(feePayer, _mockUsdc, feeAmount);

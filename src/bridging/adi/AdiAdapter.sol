@@ -82,6 +82,11 @@ contract AdiAdapter is BaseBridgeAdapter, RescuableNative, RescuableToken, IAdiB
 
         address destinationChainAdapter = _destinationChainAdapterOf[destinationChainId];
         require(destinationChainAdapter != address(0), Errors.InvalidParameter());
+        require(
+            ICrossChainForwarder(ADI_CROSS_CHAIN_CONTROLLER).getRequiredForwardingSuccessesByChain(destinationChainId)
+                > 0,
+            RequiredForwardingSuccessesNotSet()
+        );
 
         uint256 adjustedGasLimit = _withReceiverOverhead(payloadExecutionGasLimit);
         (uint256 nativeFee, ICrossChainForwarder.Fee[] memory fees, uint256 successfulQuotes) =

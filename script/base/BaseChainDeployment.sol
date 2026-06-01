@@ -219,6 +219,10 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
         require(
             forwarder.getForwarderBridgeAdaptersByChain(remoteChainId).length > 0, "Adi CCC forwarder adapters not set"
         );
+        require(
+            forwarder.getRequiredForwardingSuccessesByChain(remoteChainId) > 0,
+            "Adi CCC required forwarding successes not set"
+        );
 
         ICrossChainReceiver receiver = ICrossChainReceiver(adiCrossChainController);
         require(
