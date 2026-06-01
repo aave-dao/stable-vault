@@ -247,6 +247,9 @@ contract AdiAdapter is BaseBridgeAdapter, RescuableNative, RescuableToken, IAdiB
         return keccak256(encodedTransaction);
     }
 
+    /// @dev Funds the CCC with the full quoted fee before forwarding. a.DI never refunds, so the quoted fee for any
+    /// leg that fails to send stays in the CCC; `_refundExcessNative` only returns native paid above the quote.
+    /// Leftovers are recoverable by the CCC owner.
     function _fundCrossChainController(address feePayer, uint256 nativeFee, ICrossChainForwarder.Fee[] memory fees)
         internal
     {
