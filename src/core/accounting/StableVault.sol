@@ -738,19 +738,21 @@ contract StableVault is
         view
         returns (uint256, uint256)
     {
-        (uint256 fullAmountRay, uint256 fullGuaranteedAmountRay, uint256 fullSharesToRedeem) =
-            _previewFullWithdrawalRequest(from);
-        require(amountRay <= fullAmountRay, Errors.InsufficientFunds());
+        uint256 fromUserSubVaultId = $storage().positions[from].subVaultId;
+        // `transfer` already accrued this sub-vault's rate; read it back and round the share value down so
+        // the cap never overstates what the sender's shares are worth.
+        uint256 fromUserConversionRate = $storage().subVaultById[fromUserSubVaultId].conversionRate;
+        uint256 fromUserTotalShares = $storage().positions[from].shares;
+        // Round down the withdrawal amount, so that the rounding is in favor of the protocol.
+        uint256 totalAvailableAmountRayFromShares = fromUserTotalShares.rayMulDown(fromUserConversionRate);
 
-        if (amountRay == fullAmountRay) {
-            return (fullGuaranteedAmountRay, fullSharesToRedeem);
-        }
+        require(amountRay <= totalAvailableAmountRayFromShares, Errors.InsufficientFunds());
 
-        uint256 fromUserShares = amountRay.rayDivUp(fromConversionRate);
+        uint256 fromUserSharesToBurn = amountRay.rayDivUp(fromConversionRate);
 
-        require(_areRemainingSharesRedeemable(from, fromUserShares, fromSubVaultId), Errors.InvalidAmount());
+        require(_areRemainingSharesRedeemable(from, fromUserSharesToBurn, fromSubVaultId), Errors.InvalidAmount());
         uint256 guaranteedAmountRay = _getAmountTakenFromOriginalDeposit(from, amountRay);
-        return (guaranteedAmountRay, fromUserShares);
+        return (guaranteedAmountRay, fromUserSharesToBurn);
     }
 
     function _areRemainingSharesRedeemable(address user, uint256 redeemedShares, uint256 subVaultId)
