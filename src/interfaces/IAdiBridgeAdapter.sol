@@ -14,14 +14,14 @@ interface IAdiBridgeAdapter is IBridgeAdapter {
     /// @custom:selector 0x207ea6be
     error NoSuccessfulQuotes();
 
+    /// @notice Address checked is not the configured a.DI CrossChainController.
+    /// @custom:selector 0xe632d197
+    error OnlyCrossChainController();
+
     /// @notice The destination chain has no required forwarding successes configured, so a forward could finalize
     /// without any a.DI bridge delivering the message.
     /// @custom:selector 0xbb6ed497
     error RequiredForwardingSuccessesNotSet();
-
-    /// @notice Address checked is not the configured a.DI CrossChainController.
-    /// @custom:selector 0xe632d197
-    error OnlyCrossChainController();
 
     /// @notice Retries an already forwarded StableVault a.DI transaction using caller-provided funding.
     /// @param encodedTransaction ABI-encoded a.DI transaction to retry.
