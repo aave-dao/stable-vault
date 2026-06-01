@@ -284,8 +284,20 @@ contract StableVault is
 
         uint256 fromConversionRate = _accrueSubVaultConversionRate(fromSubVaultId);
 
-        (uint256 guaranteedAmountRay, uint256 fromUserShares) =
-            _computeTransferShares(from, amountRay, fromSubVaultId, fromConversionRate);
+        // Cap the transfer at the value the sender's shares actually back (no original-deposit floor), rounding
+        // the share value down so the cap never overstates what the shares are worth. `fromConversionRate` is the
+        // rate `transfer` just accrued for this sub-vault, so it matches storage.
+        uint256 fromUserTotalShares = $storage().positions[from].shares;
+        uint256 totalAvailableAmountRayFromShares = fromUserTotalShares.rayMulDown(fromConversionRate);
+
+        // If the amountRay is greater than the total available amount from shares, the user should use transferAll()
+        // instead.
+        require(amountRay <= totalAvailableAmountRayFromShares, Errors.InsufficientFunds());
+
+        uint256 fromUserShares = amountRay.rayDivUp(fromConversionRate);
+
+        require(_areRemainingSharesRedeemable(from, fromUserShares, fromSubVaultId), Errors.InvalidAmount());
+        uint256 guaranteedAmountRay = _getAmountTakenFromOriginalDeposit(from, amountRay);
 
         uint256 toSubVaultId = _getOrAssignUserSubVaultId(to);
 
@@ -729,28 +741,6 @@ contract StableVault is
             emit UserRateSet(user, subVaultId, $storage().subVaultById[subVaultId].perSecondRate);
         }
         return subVaultId;
-    }
-
-    /// @dev Computes the shares to burn from sender and guaranteed amount for a transfer.
-    /// @dev Reverts with InvalidAmount() if remaining shares would be below dust threshold (use transferAll() instead).
-    function _computeTransferShares(address from, uint256 amountRay, uint256 fromSubVaultId, uint256 fromConversionRate)
-        internal
-        view
-        returns (uint256, uint256)
-    {
-        // Cap the transfer at the value the sender's shares actually back (no original-deposit floor), rounding
-        // the share value down so the cap never overstates what the shares are worth. `fromConversionRate` is the
-        // rate `transfer` just accrued for this sub-vault, so it matches storage.
-        uint256 fromUserTotalShares = $storage().positions[from].shares;
-        uint256 totalAvailableAmountRayFromShares = fromUserTotalShares.rayMulDown(fromConversionRate);
-
-        require(amountRay <= totalAvailableAmountRayFromShares, Errors.InsufficientFunds());
-
-        uint256 fromUserSharesToBurn = amountRay.rayDivUp(fromConversionRate);
-
-        require(_areRemainingSharesRedeemable(from, fromUserSharesToBurn, fromSubVaultId), Errors.InvalidAmount());
-        uint256 guaranteedAmountRay = _getAmountTakenFromOriginalDeposit(from, amountRay);
-        return (guaranteedAmountRay, fromUserSharesToBurn);
     }
 
     function _areRemainingSharesRedeemable(address user, uint256 redeemedShares, uint256 subVaultId)
