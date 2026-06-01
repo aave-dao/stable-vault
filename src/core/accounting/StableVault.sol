@@ -738,13 +738,11 @@ contract StableVault is
         view
         returns (uint256, uint256)
     {
-        uint256 fromUserSubVaultId = $storage().positions[from].subVaultId;
-        // `transfer` already accrued this sub-vault's rate; read it back and round the share value down so
-        // the cap never overstates what the sender's shares are worth.
-        uint256 fromUserConversionRate = $storage().subVaultById[fromUserSubVaultId].conversionRate;
+        // Cap the transfer at the value the sender's shares actually back (no original-deposit floor), rounding
+        // the share value down so the cap never overstates what the shares are worth. `fromConversionRate` is the
+        // rate `transfer` just accrued for this sub-vault, so it matches storage.
         uint256 fromUserTotalShares = $storage().positions[from].shares;
-        // Round down the withdrawal amount, so that the rounding is in favor of the protocol.
-        uint256 totalAvailableAmountRayFromShares = fromUserTotalShares.rayMulDown(fromUserConversionRate);
+        uint256 totalAvailableAmountRayFromShares = fromUserTotalShares.rayMulDown(fromConversionRate);
 
         require(amountRay <= totalAvailableAmountRayFromShares, Errors.InsufficientFunds());
 
