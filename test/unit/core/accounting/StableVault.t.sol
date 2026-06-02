@@ -3000,7 +3000,14 @@ contract StableVaultTest is TestWithHelpers {
         assertTrue(stableVault.transfer(recipient, amountRay));
     }
 
-    function test_transfer_fullBalanceViaTransfer(address user, address recipient, uint256 depositAmount) public {
+    /// @dev A full-balance `transfer` is not supported: burning the whole position leaves no redeemable
+    /// remainder, so it reverts and the balance must move via `transferAll`. Transfers up to (but below)
+    /// the share-backed value are covered by the partial-transfer tests.
+    function test_transfer_fullBalance_revertsAndMovesViaTransferAll(
+        address user,
+        address recipient,
+        uint256 depositAmount
+    ) public {
         vm.assume(user != address(0));
         vm.assume(recipient != address(0));
         vm.assume(user != recipient);
@@ -3013,14 +3020,20 @@ contract StableVaultTest is TestWithHelpers {
         uint256 fullAmountRay = stableVault.getUserBalance(user);
 
         vm.prank(user);
-        assertTrue(stableVault.transfer(recipient, fullAmountRay));
+        vm.expectRevert(Errors.InvalidAmount.selector);
+        assertFalse(stableVault.transfer(recipient, fullAmountRay));
+
+        vm.prank(user);
+        assertTrue(stableVault.transferAll(recipient));
 
         assertEq(stableVault.getUserBalance(user), 0);
         assertEq(stableVault.getUserSubVault(user).id, 0);
         assertEq(stableVault.getUserBalance(recipient), fullAmountRay);
     }
 
-    function test_transfer_revertsWithInvalidAmount_whenPartialTransferFallsIntoGuaranteedPrincipalDeadZone() public {
+    function test_transfer_revertsWithInsufficientFunds_whenPartialTransferFallsIntoGuaranteedPrincipalDeadZone()
+        public
+    {
         address user = makeAddr("user");
         address recipient = makeAddr("recipient");
         MockErc20 ghoToken = new MockErc20("GHO", "GHO", 18);
@@ -3052,17 +3065,17 @@ contract StableVaultTest is TestWithHelpers {
         vm.prank(user);
         highRateVault.deposit(user, address(ghoToken), depositAmount, "");
 
-        // The raw share-backed value rounds below the partial amount, which is what makes a partial transfer of it
-        // fall into the dead zone. balanceOf no longer exposes this value: it now surfaces the principal floor.
+        // The raw share-backed value rounds below the partial amount, so this amount sits in the gap between
+        // the share-backed value and the principal floor.
         uint256 shareBackedBalanceRay = fullTransferAmountRay.rayDivDown(highRate).rayMulDown(highRate);
         assertEq(shareBackedBalanceRay, fullTransferAmountRay - 2);
         assertLt(shareBackedBalanceRay, partialTransferAmountRay);
         assertEq(highRateVault.getUserBalance(user), fullTransferAmountRay);
 
-        // A manual partial transfer into the dead zone still reverts; the fix only changes what balanceOf reports,
-        // so the recommended transfer(to, balanceOf(user)) pattern now resolves to a full transfer instead.
+        // transfer() caps the amount at the share-backed value, so an amount above it reverts with
+        // InsufficientFunds (the full position moves via transferAll()).
         vm.prank(user);
-        vm.expectRevert(Errors.InvalidAmount.selector);
+        vm.expectRevert(Errors.InsufficientFunds.selector);
         assertFalse(highRateVault.transfer(recipient, partialTransferAmountRay));
     }
 
@@ -3185,8 +3198,14 @@ contract StableVaultTest is TestWithHelpers {
         assertEq(senderShareBackedBalanceRay, fullTransferAmountRay - 2);
         assertEq(highRateVault.getUserBalance(user), fullTransferAmountRay);
 
+        // A `transfer` of the floored balance is rejected because the amount exceeds the share-backed value;
+        // the full position, principal floor included, moves through transferAll() instead.
         vm.prank(user);
-        assertTrue(highRateVault.transfer(recipient, fullTransferAmountRay));
+        vm.expectRevert(Errors.InsufficientFunds.selector);
+        assertFalse(highRateVault.transfer(recipient, fullTransferAmountRay));
+
+        vm.prank(user);
+        assertTrue(highRateVault.transferAll(recipient));
 
         assertEq(highRateVault.getUserBalance(user), 0);
         // The recipient inherits the guaranteed principal, so their balance is floored to the full amount.
@@ -3199,10 +3218,10 @@ contract StableVaultTest is TestWithHelpers {
         assertEq(iouTokenAmount, fullTransferAmountRay);
     }
 
-    /// @dev balanceOf() floors at the user's original deposit, so the canonical
-    /// transfer(to, balanceOf(user)) pattern resolves to a full transfer instead of a reverting partial one when
-    /// per-user deposit rounding leaves the share-backed balance below the principal.
-    function test_transfer_usingBalanceOf_succeeds_whenShareBackedBalanceBelowPrincipal() public {
+    /// @dev balanceOf() floors at the user's original deposit. When deposit rounding leaves the share-backed
+    /// balance below the principal, that floored balance exceeds the share-backed value, so a transfer of it
+    /// reverts; the full position moves via transferAll() instead.
+    function test_transfer_usingBalanceOf_reverts_whenShareBackedBalanceBelowPrincipal() public {
         address user = makeAddr("user");
         address recipient = makeAddr("recipient");
         MockErc20 ghoToken = new MockErc20("GHO", "GHO", 18);
@@ -3238,9 +3257,14 @@ contract StableVaultTest is TestWithHelpers {
         uint256 balance = highRateVault.balanceOf(user);
         assertEq(balance, depositAmountRay);
 
-        // Without the floor this would take the partial path and revert with InvalidAmount on leftover dust.
+        // balanceOf exceeds the share-backed value, so transfer() rejects it; the full position moves via
+        // transferAll().
         vm.prank(user);
-        assertTrue(highRateVault.transfer(recipient, balance));
+        vm.expectRevert(Errors.InsufficientFunds.selector);
+        assertFalse(highRateVault.transfer(recipient, balance));
+
+        vm.prank(user);
+        assertTrue(highRateVault.transferAll(recipient));
 
         assertEq(highRateVault.balanceOf(user), 0);
         assertEq(highRateVault.getUserSubVault(user).id, 0);
