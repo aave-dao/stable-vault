@@ -824,8 +824,23 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
         );
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
-            // EIP712 caches the deployment address in an immutable, so the runtime code is address-dependent and
-            // cannot be compared against a reference deploy; fall back to a presence check.
+            // EIP712 bakes the deployment address into an immutable, so the runtime code is address-dependent and
+            // cannot be compared against a reference deploy. Verify the deployed contract's config via its getters
+            // instead (the CREATE3 salt already pins the address).
+            WithdrawalExecutionPolicy deployed = WithdrawalExecutionPolicy(predicted);
+            require(
+                deployed.authority() == getAccessManagerAddress(_deployer()),
+                "WithdrawalExecutionPolicy: authority mismatch"
+            );
+            require(
+                deployed.getMinRedemptionCapacity() == minRedemptionCapacityRay,
+                "WithdrawalExecutionPolicy: min redemption capacity mismatch"
+            );
+            require(
+                deployed.getMinRedemptionRefillRate() == minRedemptionRefillRateRay,
+                "WithdrawalExecutionPolicy: min redemption refill rate mismatch"
+            );
+            require(deployed.getDefaultFeeBps() == 0, "WithdrawalExecutionPolicy: default fee mismatch");
             logSkip("_deployWithdrawalExecutionPolicy", "WithdrawalExecutionPolicy");
             _logDeployment("WithdrawalExecutionPolicy", WITHDRAWAL_EXECUTION_POLICY_SALT_SEED, predicted);
             return predicted;

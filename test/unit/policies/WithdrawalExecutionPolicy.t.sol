@@ -87,6 +87,13 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
         assertEq(policy.getMinRedemptionRefillRate(), 0);
     }
 
+    function test_constructor_setsExpectedValues() public view {
+        assertEq(withdrawalExecutionPolicy.authority(), address(mockAccessManager));
+        assertEq(withdrawalExecutionPolicy.getMinRedemptionCapacity(), MIN_REDEMPTION_CAPACITY);
+        assertEq(withdrawalExecutionPolicy.getMinRedemptionRefillRate(), MIN_REDEMPTION_REFILL_RATE);
+        assertEq(withdrawalExecutionPolicy.getDefaultFeeBps(), 0);
+    }
+
     // Restricted functions access control tests
 
     function test_setAssetFeeBps_reverts_ifMsgSenderIsNotAuthorized(
