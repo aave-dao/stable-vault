@@ -117,17 +117,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
         internal
         returns (WithdrawalExecutionPolicy)
     {
-        address withdrawalExecutionPolicyImpl =
-            address(new WithdrawalExecutionPolicy(withdrawalExecutionPolicyApplier, 1, 1));
-        WithdrawalExecutionPolicy policy = WithdrawalExecutionPolicy(
-            address(
-                new TransparentUpgradeableProxy(
-                    withdrawalExecutionPolicyImpl,
-                    address(this),
-                    abi.encodeCall(WithdrawalExecutionPolicy.initialize, (accessManager, 0))
-                )
-            )
-        );
+        WithdrawalExecutionPolicy policy =
+            new WithdrawalExecutionPolicy(accessManager, withdrawalExecutionPolicyApplier, 0, 1, 1);
         // forge-lint: disable-next-line(unsafe-typecast)
         policy.raiseRedemptionCapacity(uint128(MAX_REDEMPTION_CAPACITY));
         policy.raiseRedemptionRefillRate(1e30);
@@ -163,9 +154,10 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
         _policyRegistry = new PolicyRegistry(address(_mockAccessManager));
 
-        // Predict gateway proxy address after WithdrawalExecutionPolicy impl+proxy and gateway impl deployments.
+        // Predict gateway proxy address after the (non-upgradeable) WithdrawalExecutionPolicy and gateway impl
+        // deployments.
         uint256 deployerNonce = vm.getNonce(address(this));
-        address expectedGatewayProxy = vm.computeCreateAddress(address(this), deployerNonce + 3);
+        address expectedGatewayProxy = vm.computeCreateAddress(address(this), deployerNonce + 2);
 
         _mockWithdrawalExecutionPolicy =
             _deployWithdrawalExecutionPolicy(address(_mockAccessManager), expectedGatewayProxy);

@@ -3,7 +3,6 @@
 pragma solidity ^0.8.20;
 
 import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {IWithdrawalExecutionPolicy} from "src/interfaces/IWithdrawalExecutionPolicy.sol";
 import {RateLimitBucketLib} from "src/libraries/RateLimitBucketLib.sol";
@@ -47,19 +46,8 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
         uint128 minRedemptionCapacity,
         uint128 minRedemptionRefillRate
     ) internal returns (WithdrawalExecutionPolicy) {
-        address withdrawalExecutionPolicyImpl = address(
-            new WithdrawalExecutionPolicy(
-                withdrawalExecutionPolicyApplier, minRedemptionCapacity, minRedemptionRefillRate
-            )
-        );
-        WithdrawalExecutionPolicy policy = WithdrawalExecutionPolicy(
-            address(
-                new TransparentUpgradeableProxy(
-                    withdrawalExecutionPolicyImpl,
-                    address(this),
-                    abi.encodeCall(WithdrawalExecutionPolicy.initialize, (accessManager, 0))
-                )
-            )
+        WithdrawalExecutionPolicy policy = new WithdrawalExecutionPolicy(
+            accessManager, withdrawalExecutionPolicyApplier, 0, minRedemptionCapacity, minRedemptionRefillRate
         );
         policy.raiseRedemptionCapacity(SEED_REDEMPTION_CAPACITY);
         policy.raiseRedemptionRefillRate(SEED_REDEMPTION_REFILL_RATE);
@@ -87,11 +75,14 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
 
     function test_constructor_reverts_ifWithdrawalExecutionPolicyApplierIsZeroAddress() public {
         vm.expectRevert(Errors.ZeroAddress.selector);
-        new WithdrawalExecutionPolicy(address(0), MIN_REDEMPTION_CAPACITY, MIN_REDEMPTION_REFILL_RATE);
+        new WithdrawalExecutionPolicy(
+            address(mockAccessManager), address(0), 0, MIN_REDEMPTION_CAPACITY, MIN_REDEMPTION_REFILL_RATE
+        );
     }
 
     function test_constructor_acceptsZeroFloors() public {
-        WithdrawalExecutionPolicy policy = new WithdrawalExecutionPolicy(address(this), 0, 0);
+        WithdrawalExecutionPolicy policy =
+            new WithdrawalExecutionPolicy(address(mockAccessManager), address(this), 0, 0, 0);
         assertEq(policy.getMinRedemptionCapacity(), 0);
         assertEq(policy.getMinRedemptionRefillRate(), 0);
     }

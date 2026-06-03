@@ -165,17 +165,8 @@ contract StableVaultTest is TestWithHelpers {
         internal
         returns (WithdrawalExecutionPolicy)
     {
-        address withdrawalExecutionPolicyImpl =
-            address(new WithdrawalExecutionPolicy(withdrawalExecutionPolicyApplier, 1, 1));
-        WithdrawalExecutionPolicy policy = WithdrawalExecutionPolicy(
-            address(
-                new TransparentUpgradeableProxy(
-                    withdrawalExecutionPolicyImpl,
-                    address(this),
-                    abi.encodeCall(WithdrawalExecutionPolicy.initialize, (accessManager, 0))
-                )
-            )
-        );
+        WithdrawalExecutionPolicy policy =
+            new WithdrawalExecutionPolicy(accessManager, withdrawalExecutionPolicyApplier, 0, 1, 1);
         policy.raiseRedemptionCapacity(type(uint128).max - 1);
         policy.raiseRedemptionRefillRate(1e30);
         return policy;
@@ -198,10 +189,10 @@ contract StableVaultTest is TestWithHelpers {
         // Mock validatePrice to pass for any asset (tests may create additional assets)
         _mockValidatePriceForAll(address(mockPriceOracle));
 
-        // Predict StableVault proxy address after WithdrawalExecutionPolicy impl+proxy and StableVault impl
+        // Predict StableVault proxy address after the (non-upgradeable) WithdrawalExecutionPolicy and StableVault impl
         // deployments.
         uint256 deployerNonce = vm.getNonce(address(this));
-        address expectedStableVaultProxy = vm.computeCreateAddress(address(this), deployerNonce + 3);
+        address expectedStableVaultProxy = vm.computeCreateAddress(address(this), deployerNonce + 2);
 
         mockWithdrawalExecutionPolicy =
             _deployWithdrawalExecutionPolicy(address(mockAccessManager), expectedStableVaultProxy);

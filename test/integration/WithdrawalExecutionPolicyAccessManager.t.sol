@@ -5,7 +5,6 @@ pragma solidity ^0.8.22;
 import {AccessManager} from "@openzeppelin/contracts/access/manager/AccessManager.sol";
 import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Test} from "forge-std/Test.sol";
 
 import {RateLimitBucketLib} from "src/libraries/RateLimitBucketLib.sol";
@@ -18,7 +17,6 @@ contract WithdrawalExecutionPolicyAccessManagerIntegrationTest is Test {
     address internal admin = makeAddr("admin");
     address internal operator = makeAddr("operator");
     address internal applier = makeAddr("applier");
-    address internal proxyAdminOwner = makeAddr("proxyAdminOwner");
 
     AccessManager internal accessManager;
     WithdrawalExecutionPolicy internal policy;
@@ -40,16 +38,7 @@ contract WithdrawalExecutionPolicyAccessManagerIntegrationTest is Test {
         vm.warp(1_000_000);
         accessManager = new AccessManager(admin);
 
-        address impl = address(new WithdrawalExecutionPolicy(applier, MIN_CAPACITY, MIN_REFILL_RATE));
-        policy = WithdrawalExecutionPolicy(
-            address(
-                new TransparentUpgradeableProxy(
-                    impl,
-                    proxyAdminOwner,
-                    abi.encodeCall(WithdrawalExecutionPolicy.initialize, (address(accessManager), 0))
-                )
-            )
-        );
+        policy = new WithdrawalExecutionPolicy(address(accessManager), applier, 0, MIN_CAPACITY, MIN_REFILL_RATE);
 
         vm.startPrank(admin);
 
