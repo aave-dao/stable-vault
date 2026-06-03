@@ -8,14 +8,17 @@ import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessMana
 import {IFundsBridgingPolicy} from "src/interfaces/IFundsBridgingPolicy.sol";
 import {RateLimitBucketLib} from "src/libraries/RateLimitBucketLib.sol";
 import {Multicall} from "src/misc/Multicall.sol";
+import {GlobalRateLimitedPolicy} from "src/policies/base/GlobalRateLimitedPolicy.sol";
 import {Errors} from "src/types/Errors.sol";
 
 /// @title FundsBridgingPolicy
 /// @author Aave Labs
-/// @notice Per-route rate-limited bridge-funds policy. Each `(asset, destChainId, bridgeAdapter)` triple has its own
-/// bucket; amounts are denominated in the asset's native decimals. Triples default to a zero-capacity bucket (fully
-/// rate-limited) until operator configures one; setting capacity to max uint128 removes the limit entirely.
-contract FundsBridgingPolicy is AccessManaged, Multicall, IFundsBridgingPolicy {
+/// @notice Rate-limited bridge-funds policy combining per-route buckets with a global bucket. Each
+/// `(asset, destChainId, bridgeAdapter)` triple has its own bucket denominated in the asset's native decimals; the
+/// global bucket bounds total throughput across all routes, with amounts normalized to 18 decimals (the maximum
+/// supported asset decimals). All buckets default to zero capacity (fully rate-limited) until operator configures
+/// them; setting capacity to max uint128 removes the limit entirely.
+contract FundsBridgingPolicy is AccessManaged, GlobalRateLimitedPolicy, Multicall, IFundsBridgingPolicy {
     using RateLimitBucketLib for RateLimitBucketLib.Bucket;
 
     address internal immutable POLICY_APPLIER;
@@ -61,6 +64,18 @@ contract FundsBridgingPolicy is AccessManaged, Multicall, IFundsBridgingPolicy {
         uint128 newRefillRate
     );
 
+    /// @notice Emitted when the global bridging capacity is lowered.
+    event GlobalBridgingCapacityLowered(uint128 oldCapacity, uint128 newCapacity);
+
+    /// @notice Emitted when the global bridging capacity is raised.
+    event GlobalBridgingCapacityRaised(uint128 oldCapacity, uint128 newCapacity);
+
+    /// @notice Emitted when the global bridging refill rate is lowered.
+    event GlobalBridgingRefillRateLowered(uint128 oldRefillRate, uint128 newRefillRate);
+
+    /// @notice Emitted when the global bridging refill rate is raised.
+    event GlobalBridgingRefillRateRaised(uint128 oldRefillRate, uint128 newRefillRate);
+
     modifier onlyPolicyApplier() {
         require(msg.sender == POLICY_APPLIER, Errors.NotAuthorized());
         _;
@@ -81,6 +96,7 @@ contract FundsBridgingPolicy is AccessManaged, Multicall, IFundsBridgingPolicy {
         _buckets[fundsBridging.asset][fundsBridging.destChainId][fundsBridging.bridgeAdapter].consume(
             fundsBridging.amount
         );
+        _consumeGlobalBucket(fundsBridging.asset, fundsBridging.amount);
         emit FundsBridgingPolicyApplied(
             fundsBridging.caller,
             fundsBridging.bridgeAdapter,
@@ -99,7 +115,7 @@ contract FundsBridgingPolicy is AccessManaged, Multicall, IFundsBridgingPolicy {
     {
         return _buckets[fundsBridging.asset][fundsBridging.destChainId][fundsBridging.bridgeAdapter].canConsume(
             fundsBridging.amount
-        );
+        ) && _canConsumeGlobalBucket(fundsBridging.asset, fundsBridging.amount);
     }
 
     /// @notice Returns the current bridge-funds bucket for the given route.
@@ -153,5 +169,34 @@ contract FundsBridgingPolicy is AccessManaged, Multicall, IFundsBridgingPolicy {
         uint128 oldRefillRate = _buckets[asset][destChainId][bridgeAdapter].refillRate;
         _buckets[asset][destChainId][bridgeAdapter].lowerRefillRate(newRefillRate);
         emit BridgingRefillRateLowered(asset, destChainId, bridgeAdapter, oldRefillRate, newRefillRate);
+    }
+
+    /// @notice Returns the current global bridging bucket shared across all routes.
+    function getGlobalBridgingLimit() external view returns (RateLimitBucketLib.Bucket memory) {
+        return _globalBucketStorage();
+    }
+
+    /// @notice Raises the global bridging capacity. Use max uint128 to remove the limit.
+    /// @dev Starting with a full bucket, a caller could extract up to `2 * capacity` over
+    /// a `capacity / refillRate`-second interval: they can consume the full bucket at the start of the interval and
+    /// then match the refill rate for the remaining time. Set `capacity` accordingly.
+    function raiseGlobalBridgingCapacity(uint128 newCapacity) external restricted {
+        emit GlobalBridgingCapacityRaised(_raiseGlobalBucketCapacity(newCapacity), newCapacity);
+    }
+
+    /// @notice Lowers the global bridging capacity. `newCapacity = 0` fully rate-limits bridging across all routes.
+    function lowerGlobalBridgingCapacity(uint128 newCapacity) external restricted {
+        emit GlobalBridgingCapacityLowered(_lowerGlobalBucketCapacity(newCapacity), newCapacity);
+    }
+
+    /// @notice Raises the global bridging refill rate.
+    /// @dev Reverts when the global capacity is unlimited, since the rate must stay zero in that case.
+    function raiseGlobalBridgingRefillRate(uint128 newRefillRate) external restricted {
+        emit GlobalBridgingRefillRateRaised(_raiseGlobalBucketRefillRate(newRefillRate), newRefillRate);
+    }
+
+    /// @notice Lowers the global bridging refill rate. `newRefillRate = 0` stops the refill.
+    function lowerGlobalBridgingRefillRate(uint128 newRefillRate) external restricted {
+        emit GlobalBridgingRefillRateLowered(_lowerGlobalBucketRefillRate(newRefillRate), newRefillRate);
     }
 }
