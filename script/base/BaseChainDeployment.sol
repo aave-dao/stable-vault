@@ -546,6 +546,27 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
         _initBridgingLimit(policy, _gho(), destChainId, bridgeAdapter, string.concat(limitsPrefix, ".gho"));
         _initBridgingLimit(policy, _usdc(), destChainId, bridgeAdapter, string.concat(limitsPrefix, ".usdc"));
         _initBridgingLimit(policy, _usdt(), destChainId, bridgeAdapter, string.concat(limitsPrefix, ".usdt"));
+        _initGlobalBridgingLimit(policy, string.concat(_chainConfigPrefix(), ".fundsBridgingPolicy.globalLimit"));
+    }
+
+    function _initGlobalBridgingLimit(FundsBridgingPolicy policy, string memory configKey) private {
+        uint128 capacity = _configUint128(string.concat(configKey, ".capacity"));
+        uint128 refillRate = _configUint128(string.concat(configKey, ".refillRate"));
+        RateLimitBucketLib.Bucket memory bucket = policy.getGlobalBridgingLimit();
+        if (bucket.capacity < capacity) {
+            policy.raiseGlobalBridgingCapacity(capacity);
+        } else {
+            /// @custom:tx-already-executed-check Capacity matches target; reject drift above target.
+            require(bucket.capacity == capacity, "global bridging capacity mismatch");
+            logSkip("_initGlobalBridgingLimit", "global bridging capacity");
+        }
+        if (bucket.refillRate < refillRate) {
+            policy.raiseGlobalBridgingRefillRate(refillRate);
+        } else {
+            /// @custom:tx-already-executed-check Refill rate matches target; reject drift above target.
+            require(bucket.refillRate == refillRate, "global bridging refill rate mismatch");
+            logSkip("_initGlobalBridgingLimit", "global bridging refill rate");
+        }
     }
 
     function _initBridgingLimit(
@@ -791,33 +812,26 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
         uint128 minRedemptionRefillRateRay = _configUint128(
             string.concat(_chainConfigPrefix(), ".withdrawalExecutionPolicy.minRedemptionRefillRateRay")
         );
-        bytes memory implCreationCode = abi.encodePacked(
+        bytes memory initCode = abi.encodePacked(
             type(WithdrawalExecutionPolicy).creationCode,
-            abi.encode(_withdrawalExecutionPolicyTarget(), minRedemptionCapacityRay, minRedemptionRefillRateRay)
+            abi.encode(
+                getAccessManagerAddress(_deployer()),
+                _withdrawalExecutionPolicyTarget(),
+                uint16(0),
+                minRedemptionCapacityRay,
+                minRedemptionRefillRateRay
+            )
         );
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
-            _assertDeployedTransparentProxy(
-                predicted, implCreationCode, WITHDRAWAL_EXECUTION_POLICY_PROXY_ADMIN_OWNER, "WithdrawalExecutionPolicy"
-            );
+            // EIP712 caches the deployment address in an immutable, so the runtime code is address-dependent and
+            // cannot be compared against a reference deploy; fall back to a presence check.
             logSkip("_deployWithdrawalExecutionPolicy", "WithdrawalExecutionPolicy");
             _logDeployment("WithdrawalExecutionPolicy", WITHDRAWAL_EXECUTION_POLICY_SALT_SEED, predicted);
             return predicted;
         }
-        address implementation = address(
-            new WithdrawalExecutionPolicy(
-                _withdrawalExecutionPolicyTarget(), minRedemptionCapacityRay, minRedemptionRefillRateRay
-            )
-        );
-        _logDeployment("WithdrawalExecutionPolicy::Implementation", "", implementation);
-        address withdrawalExecutionPolicy = _deployTransparentProxy_create3({
-            namespacedSaltSeed: WITHDRAWAL_EXECUTION_POLICY_SALT_SEED,
-            deployer: _deployer(),
-            implementation: implementation,
-            proxyAdminOwner: WITHDRAWAL_EXECUTION_POLICY_PROXY_ADMIN_OWNER,
-            initCalldata: abi.encodeCall(
-                WithdrawalExecutionPolicy.initialize, (getAccessManagerAddress(_deployer()), 0)
-            )
+        address withdrawalExecutionPolicy = _deploy_create3({
+            namespacedSaltSeed: WITHDRAWAL_EXECUTION_POLICY_SALT_SEED, deployer: _deployer(), initCode: initCode
         });
         require(withdrawalExecutionPolicy == predicted, "WithdrawalExecutionPolicy does not match expected address");
         _logDeployment("WithdrawalExecutionPolicy", WITHDRAWAL_EXECUTION_POLICY_SALT_SEED, withdrawalExecutionPolicy);

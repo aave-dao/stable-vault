@@ -650,13 +650,18 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
     function _setupTarget__FundsBridgingPolicy(address deployer) internal {
         address fundsBridgingPolicy = getFundsBridgingPolicyAddress(deployer);
 
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](4);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](8);
 
         // Bridging rate limit (raise/lower pairs adjacent)
         roles[0] = RolesConfig.getRole__raiseBridgingCapacity();
         roles[1] = RolesConfig.getRole__lowerBridgingCapacity();
         roles[2] = RolesConfig.getRole__raiseBridgingRefillRate();
         roles[3] = RolesConfig.getRole__lowerBridgingRefillRate();
+        // Global bridging rate limit (raise/lower pairs adjacent)
+        roles[4] = RolesConfig.getRole__raiseGlobalBridgingCapacity();
+        roles[5] = RolesConfig.getRole__lowerGlobalBridgingCapacity();
+        roles[6] = RolesConfig.getRole__raiseGlobalBridgingRefillRate();
+        roles[7] = RolesConfig.getRole__lowerGlobalBridgingRefillRate();
 
         _setTargetFunctionRoles(fundsBridgingPolicy, roles);
     }

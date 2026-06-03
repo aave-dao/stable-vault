@@ -633,6 +633,27 @@ abstract contract AccountingChainDeployment is BaseChainDeployment, AccessManage
         _initDepositLimit(policy, _gho(), ".accountingChain.depositPolicy.perAssetLimits.gho");
         _initDepositLimit(policy, _usdc(), ".accountingChain.depositPolicy.perAssetLimits.usdc");
         _initDepositLimit(policy, _usdt(), ".accountingChain.depositPolicy.perAssetLimits.usdt");
+        _initGlobalDepositLimit(policy, ".accountingChain.depositPolicy.globalLimit");
+    }
+
+    function _initGlobalDepositLimit(DepositPolicy policy, string memory configKey) private {
+        uint128 capacity = _configUint128(string.concat(configKey, ".capacity"));
+        uint128 refillRate = _configUint128(string.concat(configKey, ".refillRate"));
+        RateLimitBucketLib.Bucket memory bucket = policy.getGlobalDepositLimit();
+        if (bucket.capacity < capacity) {
+            policy.raiseGlobalDepositCapacity(capacity);
+        } else {
+            /// @custom:tx-already-executed-check Capacity matches target; reject drift above target.
+            require(bucket.capacity == capacity, "global deposit capacity mismatch");
+            logSkip("_initGlobalDepositLimit", "global deposit capacity");
+        }
+        if (bucket.refillRate < refillRate) {
+            policy.raiseGlobalDepositRefillRate(refillRate);
+        } else {
+            /// @custom:tx-already-executed-check Refill rate matches target; reject drift above target.
+            require(bucket.refillRate == refillRate, "global deposit refill rate mismatch");
+            logSkip("_initGlobalDepositLimit", "global deposit refill rate");
+        }
     }
 
     function _initDepositLimit(DepositPolicy policy, address asset, string memory configKey) private {

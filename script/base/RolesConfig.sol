@@ -949,6 +949,110 @@ abstract contract RolesConfig is DeploymentConfig {
     }
 
     /// @custom:delay High
+    /// @custom:location DepositPolicy
+    function getRole__raiseGlobalDepositCapacity() internal view returns (Role memory) {
+        bytes4 selector = DepositPolicy.raiseGlobalDepositCapacity.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: HIGH_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
+        });
+    }
+
+    /// @custom:delay High
+    /// @custom:location DepositPolicy
+    function getRole__raiseGlobalDepositRefillRate() internal view returns (Role memory) {
+        bytes4 selector = DepositPolicy.raiseGlobalDepositRefillRate.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: HIGH_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
+        });
+    }
+
+    /// @custom:delay None
+    /// @custom:location DepositPolicy
+    function getRole__lowerGlobalDepositCapacity() internal pure returns (Role memory) {
+        bytes4 selector = DepositPolicy.lowerGlobalDepositCapacity.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: NO_DELAY,
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
+        });
+    }
+
+    /// @custom:delay None
+    /// @custom:location DepositPolicy
+    function getRole__lowerGlobalDepositRefillRate() internal pure returns (Role memory) {
+        bytes4 selector = DepositPolicy.lowerGlobalDepositRefillRate.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: NO_DELAY,
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
+        });
+    }
+
+    /// @custom:delay High
+    /// @custom:location FundsBridgingPolicy
+    function getRole__raiseGlobalBridgingCapacity() internal view returns (Role memory) {
+        bytes4 selector = FundsBridgingPolicy.raiseGlobalBridgingCapacity.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: HIGH_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
+        });
+    }
+
+    /// @custom:delay High
+    /// @custom:location FundsBridgingPolicy
+    function getRole__raiseGlobalBridgingRefillRate() internal view returns (Role memory) {
+        bytes4 selector = FundsBridgingPolicy.raiseGlobalBridgingRefillRate.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: HIGH_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
+        });
+    }
+
+    /// @custom:delay None
+    /// @custom:location FundsBridgingPolicy
+    function getRole__lowerGlobalBridgingCapacity() internal pure returns (Role memory) {
+        bytes4 selector = FundsBridgingPolicy.lowerGlobalBridgingCapacity.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: NO_DELAY,
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
+        });
+    }
+
+    /// @custom:delay None
+    /// @custom:location FundsBridgingPolicy
+    function getRole__lowerGlobalBridgingRefillRate() internal pure returns (Role memory) {
+        bytes4 selector = FundsBridgingPolicy.lowerGlobalBridgingRefillRate.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: NO_DELAY,
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
+        });
+    }
+
+    /// @custom:delay High
     /// @custom:location WithdrawalExecutionPolicy
     function getRole__raiseRedemptionCapacity() internal view returns (Role memory) {
         bytes4 selector = WithdrawalExecutionPolicy.raiseRedemptionCapacity.selector;
@@ -1183,7 +1287,7 @@ abstract contract RolesConfig is DeploymentConfig {
     }
 
     function getAllFunctionBasedRoles() internal view returns (Role[] memory) {
-        Role[] memory roles = new Role[](87);
+        Role[] memory roles = new Role[](95);
 
         // AssetRegistry
         roles[0] = getRole__setAssetConfig();
@@ -1301,6 +1405,16 @@ abstract contract RolesConfig is DeploymentConfig {
         roles[84] = getRole__adiEmergencyEtherTransfer();
         roles[85] = getRole__adiTransferOwnership();
         roles[86] = getRole__adiUpdateGuardian();
+
+        // DepositPolicy / FundsBridgingPolicy global rate-limit
+        roles[87] = getRole__raiseGlobalDepositCapacity();
+        roles[88] = getRole__raiseGlobalDepositRefillRate();
+        roles[89] = getRole__lowerGlobalDepositCapacity();
+        roles[90] = getRole__lowerGlobalDepositRefillRate();
+        roles[91] = getRole__raiseGlobalBridgingCapacity();
+        roles[92] = getRole__raiseGlobalBridgingRefillRate();
+        roles[93] = getRole__lowerGlobalBridgingCapacity();
+        roles[94] = getRole__lowerGlobalBridgingRefillRate();
 
         return roles;
     }
