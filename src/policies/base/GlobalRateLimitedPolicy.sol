@@ -9,12 +9,11 @@ import {Constants} from "src/types/Constants.sol";
 /// @title GlobalRateLimitedPolicy
 /// @author Aave Labs
 /// @notice Base for policies that complement their per-key buckets with a single global bucket bounding total
-/// throughput across all keys, with amounts normalized to 18 decimals so heterogeneous assets share one budget.
+/// throughput across all keys, with amounts normalized so heterogeneous assets share one budget.
 /// Inheriting policies own the public getter, setters, and events; this base holds the bucket and the consume/normalize
 /// plumbing.
-/// @dev The bucket lives in namespaced (ERC-7201) storage so inheriting it cannot collide with the inheritor's layout.
-/// Override `_globalBucketStorage` to point at a different bucket, or `_normalizeToGlobalBucketUnit` to change the
-/// unit.
+/// @dev Default base implementation normalizes amounts to the max supported asset decimals: 18. Override
+/// `_normalizeToGlobalBucketUnit` to normalize to a different unit.
 abstract contract GlobalRateLimitedPolicy {
     using RateLimitBucketLib for RateLimitBucketLib.Bucket;
 
@@ -38,17 +37,17 @@ abstract contract GlobalRateLimitedPolicy {
         return $storage().globalBucket;
     }
 
-    /// @dev Consumes `amount` (in `asset` decimals) from the global bucket, normalized to 18 decimals.
+    /// @dev Consumes `amount`, normalized from `asset` decimals to the bucket units, from the global bucket.
     function _consumeGlobalBucket(address asset, uint256 amount) internal virtual {
         _globalBucketStorage().consume(_normalizeToGlobalBucketUnit(asset, amount));
     }
 
-    /// @dev Whether the global bucket would accept `amount` (in `asset` decimals), normalized to 18 decimals.
+    /// @dev Whether the global bucket would accept `amount`, normalized from `asset` decimals to the bucket units.
     function _canConsumeGlobalBucket(address asset, uint256 amount) internal view virtual returns (bool) {
         return _globalBucketStorage().canConsume(_normalizeToGlobalBucketUnit(asset, amount));
     }
 
-    /// @dev Normalizes `amount` from `asset` decimals to the global bucket's 18-decimal unit.
+    /// @dev Normalizes `amount` from `asset` decimals to the global bucket's units.
     function _normalizeToGlobalBucketUnit(address asset, uint256 amount) internal view virtual returns (uint256) {
         return AssetLib.convertDecimals(amount, AssetLib.getDecimals(asset), Constants.MAX_SUPPORTED_ASSET_DECIMALS);
     }
