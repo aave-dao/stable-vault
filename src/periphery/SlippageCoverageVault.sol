@@ -40,6 +40,7 @@ contract SlippageCoverageVault is AccessManaged, Multicall, ReentrancyGuardTrans
     bool internal _overrideMode;
     uint16 internal _maxSlippageBps;
     uint16 internal _overrideMaxSlippageBps;
+    /// @notice Per-tx cap applies to every invocation of `pullCoverage` (unless override mode is enabled).
     mapping(address asset => uint256) internal _pullCapPerTx;
     mapping(address asset => Window) internal _windowByAsset;
 
