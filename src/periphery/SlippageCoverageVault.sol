@@ -14,12 +14,12 @@ import {Errors} from "src/types/Errors.sol";
 
 /// @title SlippageCoverageVault
 /// @author Aave Labs
-/// @notice Holds coverage capital for rebalance-swap shortfalls. Push-based flows to/from the immutable bound
-/// Swapper: outflows cover shortfalls (gated by per-tx + fixed-window caps with lazy rollover; override mode
-/// bypasses caps), inflows return unconsumed `assetIn` residual (no caps — window state tracks outflows only).
-/// @dev This vault is an operational helper, not a strict on-chain bound. The bound Swapper drives the coverage
+/// @notice Holds coverage capital for rebalance-swap shortfalls. Flows to/from the immutable bound
+/// Swapper: outflows cover shortfalls, inflows return unconsumed `assetIn` residual.
+/// @dev Override mode bypasses caps, but the bound Swapper enforces slippage limits against `_overrideMaxSlippageBps`.
+/// @dev This vault is an operational helper. The bound Swapper drives the coverage
 /// flow and decides whether to return leftover `assetIn`, so the caps here limit but do not guarantee the
-/// Swapper's 1:1 invariant. Size the caps as an operational safety net rather than a hard protocol guarantee.
+/// Allocator's 1:1 invariant. Size the caps as an operational safety net rather than a hard protocol guarantee.
 contract SlippageCoverageVault is AccessManaged, Multicall, ReentrancyGuardTransient, ISlippageCoverageVault {
     using SafeERC20 for IERC20;
 
