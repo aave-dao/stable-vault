@@ -140,7 +140,9 @@ contract SlippageCoverageVault is AccessManaged, Multicall, ReentrancyGuardTrans
     //////////////////////////////// RESTRICTED FUNCTIONS ////////////////////////////////
 
     /// @notice Enables override mode. While enabled, `pullCoverage` bypasses both per-tx and window caps and the
-    /// Swapper accepts the higher `overrideMaxSlippageBps`. Reverts with `AlreadyEnabled` if already enabled.
+    /// Swapper enforces slippage against `overrideMaxSlippageBps` instead of `maxSlippageBps`. The two slippage bounds
+    /// are independent: `overrideMaxSlippageBps` is not required to exceed `maxSlippageBps`, so an operator can bypass
+    /// the caps with the same or a tighter slippage tolerance. Reverts with `AlreadyEnabled` if already enabled.
     function enableOverrideMode() external restricted {
         require(!_overrideMode, AlreadyEnabled());
         _overrideMode = true;
