@@ -3,6 +3,7 @@
 pragma solidity ^0.8.22;
 
 import {AccessManaged} from "@openzeppelin/contracts/access/manager/AccessManaged.sol";
+import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
@@ -100,6 +101,7 @@ contract SlippageCoverageVault is AccessManaged, Multicall, ReentrancyGuardTrans
         uint16 initialOverrideMaxSlippageBps,
         bool initialOverrideMode
     ) AccessManaged(authority) {
+        IAccessManager(authority).canCall(address(0), address(0), bytes4(0));
         require(slippageBeneficiary != address(0), Errors.ZeroAddress());
         require(initialMaxSlippageBps <= Constants.MAX_BPS, Errors.InvalidParameter());
         require(initialOverrideMaxSlippageBps <= Constants.MAX_BPS, Errors.InvalidParameter());
