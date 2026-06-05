@@ -71,8 +71,8 @@ abstract contract ATokenVaultDeployment is Script {
             (
                 owner,
                 0,
-                string(abi.encodePacked("Aave Stable Vault's ", IERC20Metadata(underlying).name())),
-                string(abi.encodePacked("ASV/", IERC20Metadata(underlying).symbol())),
+                string(abi.encodePacked("Aave Stable Vault - aToken Vault ", IERC20Metadata(underlying).name())),
+                string(abi.encodePacked("ATV/", IERC20Metadata(underlying).symbol())),
                 initialLockDeposit
             )
         );
