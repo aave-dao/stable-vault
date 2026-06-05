@@ -70,8 +70,8 @@
     "ccipRouterAddress": "0x80226fc0Ee2b096224EeAc085Bb9a8cba1146f7D",
     "aaveV3PoolAddressesProvider": "0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e",
     "adi": {
-      "crossChainController": "0x0000000000000000000000000000000000000000",
-      "registerOnGateway": false
+      "crossChainController": "0x0000000000000000000000000000000000000000", // TODO: Set a.DI CCC address
+      "registerOnGateway": true
     },
     "fundsBridgingPolicy": {
       "globalLimit": {
@@ -95,8 +95,8 @@
     },
     "withdrawalExecutionPolicy": {
       "redemptionLimit": {
-        "capacityRay": "TBD", // TODO: set
-        "refillRateRay": "TBD" // TODO: set
+        "capacityRay": "50000000000000000000000000000000", // 50k USD
+        "refillRateRay": "2314814814814814814814814814" // 200k USD/day
       },
       "minRedemptionCapacityRay": "0",
       "minRedemptionRefillRateRay": "0"
@@ -139,15 +139,15 @@
       },
       "perAssetLimits": {
         "gho": {
-          "capacity": "1000000000000000000000000", // 1,000,000 GHO
+          "capacity": "250000000000000000000000", // 250,000 GHO
           "refillRate": "11574074074074074074" // 1,000,000 GHO/day
         },
         "usdc": {
-          "capacity": "1000000000000", // 1,000,000 USDC
+          "capacity": "250000000000", //250,000 USDC
           "refillRate": "11574074" // 1,000,000 USDC/day
         },
         "usdt": {
-          "capacity": "1000000000000", // 1,000,000 USDT
+          "capacity": "250000000000", // 250,000 USDT
           "refillRate": "11574074" // 1,000,000 USDT/day
         }
       }
@@ -174,8 +174,8 @@
     },
     "withdrawalExecutionPolicy": {
       "redemptionLimit": {
-        "capacityRay": "TBD", // TODO: set
-        "refillRateRay": "TBD" // TODO: set
+        "capacityRay": "500000000000000000000000000000000", // $ 500,000
+        "refillRateRay": "23148148148148148148148148148" // $ 2,000,000 /day
       },
       "minRedemptionCapacityRay": "0",
       "minRedemptionRefillRateRay": "0"
