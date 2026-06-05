@@ -3,6 +3,7 @@
 pragma solidity ^0.8.22;
 
 import {AccessManaged} from "@openzeppelin/contracts/access/manager/AccessManaged.sol";
+import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
@@ -14,12 +15,12 @@ import {Errors} from "src/types/Errors.sol";
 
 /// @title SlippageCoverageVault
 /// @author Aave Labs
-/// @notice Holds coverage capital for rebalance-swap shortfalls. Push-based flows to/from the immutable bound
-/// Swapper: outflows cover shortfalls (gated by per-tx + fixed-window caps with lazy rollover; override mode
-/// bypasses caps), inflows return unconsumed `assetIn` residual (no caps — window state tracks outflows only).
-/// @dev This vault is an operational helper, not a strict on-chain bound. The bound Swapper drives the coverage
+/// @notice Holds coverage capital for rebalance-swap shortfalls. Flows to/from the immutable bound
+/// Swapper: outflows cover shortfalls, inflows return unconsumed `assetIn` residual.
+/// @dev Override mode bypasses caps, but the bound Swapper enforces slippage limits against `_overrideMaxSlippageBps`.
+/// @dev This vault is an operational helper. The bound Swapper drives the coverage
 /// flow and decides whether to return leftover `assetIn`, so the caps here limit but do not guarantee the
-/// Swapper's 1:1 invariant. Size the caps as an operational safety net rather than a hard protocol guarantee.
+/// Allocator's 1:1 invariant. Size the caps as an operational safety net rather than a hard protocol guarantee.
 contract SlippageCoverageVault is AccessManaged, Multicall, ReentrancyGuardTransient, ISlippageCoverageVault {
     using SafeERC20 for IERC20;
 
@@ -40,6 +41,7 @@ contract SlippageCoverageVault is AccessManaged, Multicall, ReentrancyGuardTrans
     bool internal _overrideMode;
     uint16 internal _maxSlippageBps;
     uint16 internal _overrideMaxSlippageBps;
+    /// @notice Per-tx cap applies to every invocation of `pullCoverage` (unless override mode is enabled).
     mapping(address asset => uint256) internal _pullCapPerTx;
     mapping(address asset => Window) internal _windowByAsset;
 
@@ -99,6 +101,7 @@ contract SlippageCoverageVault is AccessManaged, Multicall, ReentrancyGuardTrans
         uint16 initialOverrideMaxSlippageBps,
         bool initialOverrideMode
     ) AccessManaged(authority) {
+        IAccessManager(authority).canCall(address(0), address(0), bytes4(0));
         require(slippageBeneficiary != address(0), Errors.ZeroAddress());
         require(initialMaxSlippageBps <= Constants.MAX_BPS, Errors.InvalidParameter());
         require(initialOverrideMaxSlippageBps <= Constants.MAX_BPS, Errors.InvalidParameter());
@@ -137,7 +140,9 @@ contract SlippageCoverageVault is AccessManaged, Multicall, ReentrancyGuardTrans
     //////////////////////////////// RESTRICTED FUNCTIONS ////////////////////////////////
 
     /// @notice Enables override mode. While enabled, `pullCoverage` bypasses both per-tx and window caps and the
-    /// Swapper accepts the higher `overrideMaxSlippageBps`. Reverts with `AlreadyEnabled` if already enabled.
+    /// Swapper enforces slippage against `overrideMaxSlippageBps` instead of `maxSlippageBps`. The two slippage bounds
+    /// are independent: `overrideMaxSlippageBps` is not required to exceed `maxSlippageBps`, so an operator can bypass
+    /// the caps with the same or a tighter slippage tolerance. Reverts with `AlreadyEnabled` if already enabled.
     function enableOverrideMode() external restricted {
         require(!_overrideMode, AlreadyEnabled());
         _overrideMode = true;

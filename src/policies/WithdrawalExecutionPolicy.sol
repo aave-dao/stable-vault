@@ -305,11 +305,12 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
         _markNonceAsUsed(signer, nonce);
     }
 
-    /// @notice Raises the redemption bucket capacity. The always-exit invariant is enforced by
-    /// `MIN_REDEMPTION_CAPACITY`, not by keeping the bucket finite.
+    /// @notice Raises the redemption bucket capacity.
+    /// @dev Cannot set below `MIN_REDEMPTION_CAPACITY`.
     /// @dev Starting with a full bucket, a caller could extract up to `2 * capacity` over a
     /// `capacity / refillRate`-second interval. Set `capacity` accordingly.
     function raiseRedemptionCapacity(uint128 newCapacity) external restricted {
+        require(newCapacity >= MIN_REDEMPTION_CAPACITY, BelowMinRedemptionCapacity());
         uint128 oldCapacity = $storage().redemptionBucket.capacity;
         $storage().redemptionBucket.raiseCapacity(newCapacity);
         emit RedemptionCapacityRaised(oldCapacity, newCapacity);
@@ -324,7 +325,9 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
     }
 
     /// @notice Raises the redemption bucket refill rate.
+    /// @dev Cannot set below `MIN_REDEMPTION_REFILL_RATE`.
     function raiseRedemptionRefillRate(uint128 newRefillRate) external restricted {
+        require(newRefillRate >= MIN_REDEMPTION_REFILL_RATE, BelowMinRedemptionRefillRate());
         uint128 oldRefillRate = $storage().redemptionBucket.refillRate;
         $storage().redemptionBucket.raiseRefillRate(newRefillRate);
         emit RedemptionRefillRateRaised(oldRefillRate, newRefillRate);

@@ -66,6 +66,22 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         new SlippageCoverageVault(beneficiary, address(_accessManager), DEFAULT_MAX_BPS, 10_001, false);
     }
 
+    function test_constructor_reverts_ifAuthorityIsNotAContract() public {
+        address authority = makeAddr("AUTHORITY");
+        assertEq(authority.code.length, 0);
+        vm.expectRevert();
+        new SlippageCoverageVault(beneficiary, authority, DEFAULT_MAX_BPS, DEFAULT_OVERRIDE_MAX_BPS, false);
+    }
+
+    function test_constructor_reverts_ifAuthorityIsZero() public {
+        vm.expectRevert();
+        new SlippageCoverageVault(beneficiary, address(0), DEFAULT_MAX_BPS, DEFAULT_OVERRIDE_MAX_BPS, false);
+    }
+
+    function test_constructor_setsAuthority() public view {
+        assertEq(_vault.authority(), address(_accessManager));
+    }
+
     function test_constructor_setsImmutableAndState_overrideOff() public view {
         assertEq(_vault.getBeneficiary(), beneficiary);
         assertEq(_vault.getMaxSlippageBps(), DEFAULT_MAX_BPS);

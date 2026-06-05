@@ -41,25 +41,35 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
         );
     }
 
+    /// @dev Deploys a policy WITHOUT seeding the bucket, so `capacity` and `refillRate` start at the post-init `0`.
+    /// This is the state in which the raise-path floor check matters: an admin ramping up from zero must not be able
+    /// to land on a sub-floor value.
+    function _deployUnseededPolicyWithCustomFloors(
+        address accessManager,
+        address withdrawalExecutionPolicyApplier,
+        uint128 minCapacity,
+        uint128 minRefillRate
+    ) internal returns (WithdrawalExecutionPolicy) {
+        address impl = address(
+            new WithdrawalExecutionPolicy(withdrawalExecutionPolicyApplier, minCapacity, minRefillRate)
+        );
+        return WithdrawalExecutionPolicy(
+            address(
+                new TransparentUpgradeableProxy(
+                    impl, address(this), abi.encodeCall(WithdrawalExecutionPolicy.initialize, (accessManager, 0))
+                )
+            )
+        );
+    }
+
     function _deployWithdrawalExecutionPolicy(
         address accessManager,
         address withdrawalExecutionPolicyApplier,
         uint128 minRedemptionCapacity,
         uint128 minRedemptionRefillRate
     ) internal returns (WithdrawalExecutionPolicy) {
-        address withdrawalExecutionPolicyImpl = address(
-            new WithdrawalExecutionPolicy(
-                withdrawalExecutionPolicyApplier, minRedemptionCapacity, minRedemptionRefillRate
-            )
-        );
-        WithdrawalExecutionPolicy policy = WithdrawalExecutionPolicy(
-            address(
-                new TransparentUpgradeableProxy(
-                    withdrawalExecutionPolicyImpl,
-                    address(this),
-                    abi.encodeCall(WithdrawalExecutionPolicy.initialize, (accessManager, 0))
-                )
-            )
+        WithdrawalExecutionPolicy policy = _deployUnseededPolicyWithCustomFloors(
+            accessManager, withdrawalExecutionPolicyApplier, minRedemptionCapacity, minRedemptionRefillRate
         );
         policy.raiseRedemptionCapacity(SEED_REDEMPTION_CAPACITY);
         policy.raiseRedemptionRefillRate(SEED_REDEMPTION_REFILL_RATE);
@@ -1699,7 +1709,7 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
     }
 
     function test_raiseRedemptionCapacity_revertsOnNonStrictGreater(uint128 newCapacity) public {
-        newCapacity = uint128(bound(newCapacity, 0, SEED_REDEMPTION_CAPACITY));
+        newCapacity = uint128(bound(newCapacity, MIN_REDEMPTION_CAPACITY, SEED_REDEMPTION_CAPACITY));
         vm.expectRevert(Errors.InvalidParameter.selector);
         withdrawalExecutionPolicy.raiseRedemptionCapacity(newCapacity);
     }
@@ -1713,6 +1723,42 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
     function test_raiseRedemptionCapacity_revertsOnUnlimited_postSeed_libraryGuard() public {
         vm.expectRevert(Errors.InvalidParameter.selector);
         withdrawalExecutionPolicy.raiseRedemptionCapacity(type(uint128).max);
+    }
+
+    function test_raiseRedemptionCapacity_reverts_ifBelowFloor(uint128 belowFloor) public {
+        WithdrawalExecutionPolicy policy =
+            _deployUnseededPolicyWithCustomFloors(address(mockAccessManager), address(this), 1e30, 1e25);
+        // Strictly greater than the initial `0` (so the lib's strict-greater rule would otherwise pass) but below the
+        // floor: the raise must still be rejected.
+        belowFloor = uint128(bound(belowFloor, 1, 1e30 - 1));
+        vm.expectRevert(WithdrawalExecutionPolicy.BelowMinRedemptionCapacity.selector);
+        policy.raiseRedemptionCapacity(belowFloor);
+    }
+
+    function test_raiseRedemptionRefillRate_reverts_ifBelowFloor(uint128 belowFloor) public {
+        WithdrawalExecutionPolicy policy =
+            _deployUnseededPolicyWithCustomFloors(address(mockAccessManager), address(this), 1e30, 1e25);
+        belowFloor = uint128(bound(belowFloor, 1, 1e25 - 1));
+        vm.expectRevert(WithdrawalExecutionPolicy.BelowMinRedemptionRefillRate.selector);
+        policy.raiseRedemptionRefillRate(belowFloor);
+    }
+
+    function test_raiseRedemptionCapacity_succeedsAtFloorFromZero() public {
+        WithdrawalExecutionPolicy policy =
+            _deployUnseededPolicyWithCustomFloors(address(mockAccessManager), address(this), 1e30, 1e25);
+        vm.expectEmit(true, true, true, true, address(policy));
+        emit WithdrawalExecutionPolicy.RedemptionCapacityRaised(0, 1e30);
+        policy.raiseRedemptionCapacity(1e30);
+        assertEq(policy.getRedemptionBucket().capacity, 1e30, "Capacity should reach floor from zero");
+    }
+
+    function test_raiseRedemptionRefillRate_succeedsAtFloorFromZero() public {
+        WithdrawalExecutionPolicy policy =
+            _deployUnseededPolicyWithCustomFloors(address(mockAccessManager), address(this), 1e30, 1e25);
+        vm.expectEmit(true, true, true, true, address(policy));
+        emit WithdrawalExecutionPolicy.RedemptionRefillRateRaised(0, 1e25);
+        policy.raiseRedemptionRefillRate(1e25);
+        assertEq(policy.getRedemptionBucket().refillRate, 1e25, "Refill rate should reach floor from zero");
     }
 
     function test_applyWithdrawalExecutionPolicy_consumesBucket(uint128 iouAmountRay) public {
