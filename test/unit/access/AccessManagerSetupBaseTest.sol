@@ -87,20 +87,24 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
     }
 
     function _secondaryAdminRateLimitRoles() internal view returns (RolesConfig.Role[] memory) {
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](12);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](16);
 
         roles[0] = RolesConfig.getRole__raiseDepositCapacity();
         roles[1] = RolesConfig.getRole__raiseDepositRefillRate();
-        roles[2] = RolesConfig.getRole__raiseBridgingCapacity();
-        roles[3] = RolesConfig.getRole__raiseBridgingRefillRate();
-        roles[4] = RolesConfig.getRole__raiseRedemptionCapacity();
-        roles[5] = RolesConfig.getRole__raiseRedemptionRefillRate();
-        roles[6] = RolesConfig.getRole__raisePullCapPerTx();
-        roles[7] = RolesConfig.getRole__raiseWindowCap();
-        roles[8] = RolesConfig.getRole__lowerWindowSeconds();
-        roles[9] = RolesConfig.getRole__setMaxSlippageBps();
-        roles[10] = RolesConfig.getRole__setOverrideMaxSlippageBps();
-        roles[11] = RolesConfig.getRole__sweepSlippageCoverageVault();
+        roles[2] = RolesConfig.getRole__raiseGlobalDepositCapacity();
+        roles[3] = RolesConfig.getRole__raiseGlobalDepositRefillRate();
+        roles[4] = RolesConfig.getRole__raiseBridgingCapacity();
+        roles[5] = RolesConfig.getRole__raiseBridgingRefillRate();
+        roles[6] = RolesConfig.getRole__raiseGlobalBridgingCapacity();
+        roles[7] = RolesConfig.getRole__raiseGlobalBridgingRefillRate();
+        roles[8] = RolesConfig.getRole__raiseRedemptionCapacity();
+        roles[9] = RolesConfig.getRole__raiseRedemptionRefillRate();
+        roles[10] = RolesConfig.getRole__raisePullCapPerTx();
+        roles[11] = RolesConfig.getRole__raiseWindowCap();
+        roles[12] = RolesConfig.getRole__lowerWindowSeconds();
+        roles[13] = RolesConfig.getRole__setMaxSlippageBps();
+        roles[14] = RolesConfig.getRole__setOverrideMaxSlippageBps();
+        roles[15] = RolesConfig.getRole__sweepSlippageCoverageVault();
 
         return roles;
     }
@@ -270,7 +274,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
     }
 
     function test_disablerProfile_hasTheExpectedRoles() public view {
-        uint64[] memory expected = new uint64[](18);
+        uint64[] memory expected = new uint64[](22);
         // Allocator (defensive)
         expected[0] = RolesConfig.getRole__rebalance().roleId;
         expected[1] = RolesConfig.getRole__removeStrategy().roleId;
@@ -294,9 +298,13 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         // DepositPolicy
         expected[14] = RolesConfig.getRole__lowerDepositCapacity().roleId;
         expected[15] = RolesConfig.getRole__lowerDepositRefillRate().roleId;
+        expected[16] = RolesConfig.getRole__lowerGlobalDepositCapacity().roleId;
+        expected[17] = RolesConfig.getRole__lowerGlobalDepositRefillRate().roleId;
         // FundsBridgingPolicy
-        expected[16] = RolesConfig.getRole__lowerBridgingCapacity().roleId;
-        expected[17] = RolesConfig.getRole__lowerBridgingRefillRate().roleId;
+        expected[18] = RolesConfig.getRole__lowerBridgingCapacity().roleId;
+        expected[19] = RolesConfig.getRole__lowerBridgingRefillRate().roleId;
+        expected[20] = RolesConfig.getRole__lowerGlobalBridgingCapacity().roleId;
+        expected[21] = RolesConfig.getRole__lowerGlobalBridgingRefillRate().roleId;
         _assertProfileHasExactlyTheseRoles(_getProfile__Disabler(), expected);
 
         for (uint256 i = 0; i < expected.length; i++) {

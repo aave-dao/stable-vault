@@ -421,7 +421,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         address disablerProfile = _getProfile__Disabler();
         require(disablerProfile != address(0), "Disabler profile address not set");
 
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](18);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](22);
 
         // Allocator (defensive)
         roles[0] = RolesConfig.getRole__rebalance();
@@ -445,9 +445,13 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         // DepositPolicy is Accounting Chain-only, but granted in both chain setups.
         roles[14] = RolesConfig.getRole__lowerDepositCapacity();
         roles[15] = RolesConfig.getRole__lowerDepositRefillRate();
+        roles[16] = RolesConfig.getRole__lowerGlobalDepositCapacity();
+        roles[17] = RolesConfig.getRole__lowerGlobalDepositRefillRate();
         // FundsBridgingPolicy
-        roles[16] = RolesConfig.getRole__lowerBridgingCapacity();
-        roles[17] = RolesConfig.getRole__lowerBridgingRefillRate();
+        roles[18] = RolesConfig.getRole__lowerBridgingCapacity();
+        roles[19] = RolesConfig.getRole__lowerBridgingRefillRate();
+        roles[20] = RolesConfig.getRole__lowerGlobalBridgingCapacity();
+        roles[21] = RolesConfig.getRole__lowerGlobalBridgingRefillRate();
 
         _grantRolesToProfile(disablerProfile, roles);
     }
