@@ -75,21 +75,21 @@
     },
     "fundsBridgingPolicy": {
       "globalLimit": {
-        "capacity": "1000000000000000000000000", // 1,000,000 (18 decimals, normalized cross-asset)
-        "refillRate": "11574074074074074074" // 1,000,000/day (18 decimals)
+        "capacity": "2000000000000000000000000", // 2,000,000 (18 decimals, normalized cross-asset)
+        "refillRate": "23148148148148148148" // 2,000,000/day (18 decimals)
       },
       "perAssetLimits": {
         "gho": {
-          "capacity": "1000000000000000000000000", // 1,000,000 GHO
-          "refillRate": "11574074074074074074" // 1,000,000 GHO/day
+          "capacity": "2000000000000000000000000", // 2,000,000 GHO
+          "refillRate": "23148148148148148148" // 2,000,000 GHO/day
         },
         "usdc": {
-          "capacity": "1000000000000", // 1,000,000 USDC
-          "refillRate": "11574074" // 1,000,000 USDC/day
+          "capacity": "2000000000000", // 2,000,000 USDC
+          "refillRate": "23148148" // 2,000,000 USDC/day
         },
         "usdt": {
-          "capacity": "1000000000000", // 1,000,000 USDT
-          "refillRate": "11574074" // 1,000,000 USDT/day
+          "capacity": "2000000000000", // 2,000,000 USDT
+          "refillRate": "23148148" // 2,000,000 USDT/day
         }
       }
     },
