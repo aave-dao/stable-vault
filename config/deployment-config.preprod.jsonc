@@ -74,6 +74,10 @@
       "registerOnGateway": true
     },
     "fundsBridgingPolicy": {
+      "globalLimit": {
+        "capacity": "1000000000000000000000000", // 1,000,000 (18 decimals, normalized cross-asset)
+        "refillRate": "11574074074074074074" // 1,000,000/day (18 decimals)
+      },
       "perAssetLimits": {
         "gho": {
           "capacity": "1000000000000000000000000", // 1,000,000 GHO
@@ -129,6 +133,10 @@
     "chainlinkBundleAggregatorProxy": "0x44eed2D41939C1F8096A27a5FF998f134Ccd3dc2",
     "sequencerUptimeFeed": "0xFdB631F5EE196F0ed6FAa767959853A9F217697D",
     "depositPolicy": {
+      "globalLimit": {
+        "capacity": "250000000000000000000000", // 250,000 (18 decimals, normalized cross-asset)
+        "refillRate": "11574074074074074074" // 1,000,000/day (18 decimals)
+      },
       "perAssetLimits": {
         "gho": {
           "capacity": "1000000000000000000000000", // 1,000,000 GHO
@@ -145,6 +153,10 @@
       }
     },
     "fundsBridgingPolicy": {
+      "globalLimit": {
+        "capacity": "1000000000000000000000000", // 1,000,000 (18 decimals, normalized cross-asset)
+        "refillRate": "11574074074074074074" // 1,000,000/day (18 decimals)
+      },
       "perAssetLimits": {
         "gho": {
           "capacity": "1000000000000000000000000", // 1,000,000 GHO

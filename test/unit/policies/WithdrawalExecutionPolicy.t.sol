@@ -3,7 +3,6 @@
 pragma solidity ^0.8.20;
 
 import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {IWithdrawalExecutionPolicy} from "src/interfaces/IWithdrawalExecutionPolicy.sol";
 import {RateLimitBucketLib} from "src/libraries/RateLimitBucketLib.sol";
@@ -41,24 +40,17 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
         );
     }
 
-    /// @dev Deploys a policy WITHOUT seeding the bucket, so `capacity` and `refillRate` start at the post-init `0`.
-    /// This is the state in which the raise-path floor check matters: an admin ramping up from zero must not be able
-    /// to land on a sub-floor value.
+    /// @dev Deploys a policy WITHOUT seeding the bucket, so `capacity` and `refillRate` start at the
+    /// post-deployment `0`. This is the state in which the raise-path floor check matters: an admin ramping up from
+    /// zero must not be able to land on a sub-floor value.
     function _deployUnseededPolicyWithCustomFloors(
         address accessManager,
         address withdrawalExecutionPolicyApplier,
         uint128 minCapacity,
         uint128 minRefillRate
     ) internal returns (WithdrawalExecutionPolicy) {
-        address impl = address(
-            new WithdrawalExecutionPolicy(withdrawalExecutionPolicyApplier, minCapacity, minRefillRate)
-        );
-        return WithdrawalExecutionPolicy(
-            address(
-                new TransparentUpgradeableProxy(
-                    impl, address(this), abi.encodeCall(WithdrawalExecutionPolicy.initialize, (accessManager, 0))
-                )
-            )
+        return new WithdrawalExecutionPolicy(
+            accessManager, withdrawalExecutionPolicyApplier, 0, minCapacity, minRefillRate
         );
     }
 
@@ -97,13 +89,23 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
 
     function test_constructor_reverts_ifWithdrawalExecutionPolicyApplierIsZeroAddress() public {
         vm.expectRevert(Errors.ZeroAddress.selector);
-        new WithdrawalExecutionPolicy(address(0), MIN_REDEMPTION_CAPACITY, MIN_REDEMPTION_REFILL_RATE);
+        new WithdrawalExecutionPolicy(
+            address(mockAccessManager), address(0), 0, MIN_REDEMPTION_CAPACITY, MIN_REDEMPTION_REFILL_RATE
+        );
     }
 
     function test_constructor_acceptsZeroFloors() public {
-        WithdrawalExecutionPolicy policy = new WithdrawalExecutionPolicy(address(this), 0, 0);
+        WithdrawalExecutionPolicy policy =
+            new WithdrawalExecutionPolicy(address(mockAccessManager), address(this), 0, 0, 0);
         assertEq(policy.getMinRedemptionCapacity(), 0);
         assertEq(policy.getMinRedemptionRefillRate(), 0);
+    }
+
+    function test_constructor_setsExpectedValues() public view {
+        assertEq(withdrawalExecutionPolicy.authority(), address(mockAccessManager));
+        assertEq(withdrawalExecutionPolicy.getMinRedemptionCapacity(), MIN_REDEMPTION_CAPACITY);
+        assertEq(withdrawalExecutionPolicy.getMinRedemptionRefillRate(), MIN_REDEMPTION_REFILL_RATE);
+        assertEq(withdrawalExecutionPolicy.getDefaultFeeBps(), 0);
     }
 
     // Restricted functions access control tests

@@ -461,14 +461,16 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
 
         uint256 nonce = vm.getNonce(address(this));
         address assetRegistryAddress = vm.computeCreateAddress(address(this), nonce + 1);
-        address withdrawalExecutionPolicyAddress = vm.computeCreateAddress(address(this), nonce + 3);
-        address iouTokenAddress = vm.computeCreateAddress(address(this), nonce + 4);
-        address iouTokenManagerAddress = vm.computeCreateAddress(address(this), nonce + 6);
-        address vaultAddress = vm.computeCreateAddress(address(this), nonce + 8);
-        address allocatorAddress = vm.computeCreateAddress(address(this), nonce + 10);
-        address fundsHandlerAddress = vm.computeCreateAddress(address(this), nonce + 12);
-        address gatewayAddress = vm.computeCreateAddress(address(this), nonce + 14);
-        address policyRegistryAddress = vm.computeCreateAddress(address(this), nonce + 15);
+        // WithdrawalExecutionPolicy is now a single non-upgradeable deploy (no impl+proxy), so every offset after it
+        // shifts down by one.
+        address withdrawalExecutionPolicyAddress = vm.computeCreateAddress(address(this), nonce + 2);
+        address iouTokenAddress = vm.computeCreateAddress(address(this), nonce + 3);
+        address iouTokenManagerAddress = vm.computeCreateAddress(address(this), nonce + 5);
+        address vaultAddress = vm.computeCreateAddress(address(this), nonce + 7);
+        address allocatorAddress = vm.computeCreateAddress(address(this), nonce + 9);
+        address fundsHandlerAddress = vm.computeCreateAddress(address(this), nonce + 11);
+        address gatewayAddress = vm.computeCreateAddress(address(this), nonce + 13);
+        address policyRegistryAddress = vm.computeCreateAddress(address(this), nonce + 14);
 
         stack.assetRegistry = AssetRegistry(
             address(
@@ -481,18 +483,8 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
         );
         require(address(stack.assetRegistry) == assetRegistryAddress, "asset registry address mismatch");
 
-        stack.withdrawalExecutionPolicy = WithdrawalExecutionPolicy(
-            address(
-                new TransparentUpgradeableProxy(
-                    address(
-                        new WithdrawalExecutionPolicy(
-                            vaultAddress, TEST_MIN_REDEMPTION_CAPACITY, TEST_MIN_REDEMPTION_REFILL_RATE
-                        )
-                    ),
-                    _proxyAdmin,
-                    abi.encodeCall(WithdrawalExecutionPolicy.initialize, (address(stack.accessManager), 0))
-                )
-            )
+        stack.withdrawalExecutionPolicy = new WithdrawalExecutionPolicy(
+            address(stack.accessManager), vaultAddress, 0, TEST_MIN_REDEMPTION_CAPACITY, TEST_MIN_REDEMPTION_REFILL_RATE
         );
         require(
             address(stack.withdrawalExecutionPolicy) == withdrawalExecutionPolicyAddress,
@@ -618,12 +610,14 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
 
         uint256 nonce = vm.getNonce(address(this));
         address assetRegistryAddress = vm.computeCreateAddress(address(this), nonce + 1);
-        address gatewayAddress = vm.computeCreateAddress(address(this), nonce + 10);
-        address withdrawalExecutionPolicyAddress = vm.computeCreateAddress(address(this), nonce + 3);
-        address iouTokenAddress = vm.computeCreateAddress(address(this), nonce + 4);
-        address iouTokenManagerAddress = vm.computeCreateAddress(address(this), nonce + 6);
-        address allocatorAddress = vm.computeCreateAddress(address(this), nonce + 8);
-        address policyRegistryAddress = vm.computeCreateAddress(address(this), nonce + 11);
+        // WithdrawalExecutionPolicy is now a single non-upgradeable deploy (no impl+proxy), so every offset after it
+        // shifts down by one.
+        address gatewayAddress = vm.computeCreateAddress(address(this), nonce + 9);
+        address withdrawalExecutionPolicyAddress = vm.computeCreateAddress(address(this), nonce + 2);
+        address iouTokenAddress = vm.computeCreateAddress(address(this), nonce + 3);
+        address iouTokenManagerAddress = vm.computeCreateAddress(address(this), nonce + 5);
+        address allocatorAddress = vm.computeCreateAddress(address(this), nonce + 7);
+        address policyRegistryAddress = vm.computeCreateAddress(address(this), nonce + 10);
 
         stack.assetRegistry = AssetRegistry(
             address(
@@ -636,18 +630,12 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
         );
         require(address(stack.assetRegistry) == assetRegistryAddress, "earning asset registry address mismatch");
 
-        stack.withdrawalExecutionPolicy = WithdrawalExecutionPolicy(
-            address(
-                new TransparentUpgradeableProxy(
-                    address(
-                        new WithdrawalExecutionPolicy(
-                            gatewayAddress, TEST_MIN_REDEMPTION_CAPACITY, TEST_MIN_REDEMPTION_REFILL_RATE
-                        )
-                    ),
-                    _proxyAdmin,
-                    abi.encodeCall(WithdrawalExecutionPolicy.initialize, (address(stack.accessManager), 0))
-                )
-            )
+        stack.withdrawalExecutionPolicy = new WithdrawalExecutionPolicy(
+            address(stack.accessManager),
+            gatewayAddress,
+            0,
+            TEST_MIN_REDEMPTION_CAPACITY,
+            TEST_MIN_REDEMPTION_REFILL_RATE
         );
         require(
             address(stack.withdrawalExecutionPolicy) == withdrawalExecutionPolicyAddress,

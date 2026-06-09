@@ -309,7 +309,6 @@ contract BaseTest is TestWithHelpers {
         assetRegistry_accountingChainAddress = vm.computeCreateAddress(address(this), deployerNonce_accountingChain++);
         Logger.log("\tAsset Registry (Accounting Chain) Predicted Address: %s", assetRegistry_accountingChainAddress);
 
-        deployerNonce_accountingChain++; // Incrementing for Withdrawal Policy implementation
         withdrawalExecutionPolicy_accountingChainAddress =
             vm.computeCreateAddress(address(this), deployerNonce_accountingChain++);
         Logger.log(
@@ -399,20 +398,13 @@ contract BaseTest is TestWithHelpers {
             "Asset Registry (Accounting Chain) address mismatch"
         );
 
-        // 8-9. Withdrawal Policy (Impl + Proxy)
-        address withdrawalExecutionPolicy_accountingChain_impl = address(
-            new WithdrawalExecutionPolicy(
-                vault_accountingChainAddress, TEST_MIN_REDEMPTION_CAPACITY, TEST_MIN_REDEMPTION_REFILL_RATE
-            )
-        );
-        withdrawalExecutionPolicy_accountingChain = WithdrawalExecutionPolicy(
-            address(
-                new TransparentUpgradeableProxy(
-                    withdrawalExecutionPolicy_accountingChain_impl,
-                    proxyAdmin,
-                    abi.encodeCall(WithdrawalExecutionPolicy.initialize, (accessManager_accountingChainAddress, 0))
-                )
-            )
+        // 8. Withdrawal Policy (non-upgradeable)
+        withdrawalExecutionPolicy_accountingChain = new WithdrawalExecutionPolicy(
+            accessManager_accountingChainAddress,
+            vault_accountingChainAddress,
+            0,
+            TEST_MIN_REDEMPTION_CAPACITY,
+            TEST_MIN_REDEMPTION_REFILL_RATE
         );
         Logger.log(
             "\tWithdrawal Execution Policy (Accounting Chain): %s", address(withdrawalExecutionPolicy_accountingChain)
@@ -629,7 +621,6 @@ contract BaseTest is TestWithHelpers {
         assetRegistry_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
         Logger.log("\tAsset Registry (Earning Chain) Predicted Address: %s", assetRegistry_earningChainAddress);
 
-        deployerNonce_earningChain++; // Incrementing for Withdrawal Policy implementation
         withdrawalExecutionPolicy_earningChainAddress =
             vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
         Logger.log(
@@ -706,20 +697,13 @@ contract BaseTest is TestWithHelpers {
             "Asset Registry (Earning Chain) address mismatch"
         );
 
-        // 6-7. Withdrawal Policy (Impl + Proxy)
-        address withdrawalExecutionPolicy_earningChain_impl = address(
-            new WithdrawalExecutionPolicy(
-                chainGateway_earningChainAddress, TEST_MIN_REDEMPTION_CAPACITY, TEST_MIN_REDEMPTION_REFILL_RATE
-            )
-        );
-        withdrawalExecutionPolicy_earningChain = WithdrawalExecutionPolicy(
-            address(
-                new TransparentUpgradeableProxy(
-                    withdrawalExecutionPolicy_earningChain_impl,
-                    proxyAdmin,
-                    abi.encodeCall(WithdrawalExecutionPolicy.initialize, (accessManager_earningChainAddress, 0))
-                )
-            )
+        // 6. Withdrawal Policy (non-upgradeable)
+        withdrawalExecutionPolicy_earningChain = new WithdrawalExecutionPolicy(
+            accessManager_earningChainAddress,
+            chainGateway_earningChainAddress,
+            0,
+            TEST_MIN_REDEMPTION_CAPACITY,
+            TEST_MIN_REDEMPTION_REFILL_RATE
         );
         Logger.log("\tWithdrawal Execution Policy (Earning Chain): %s", address(withdrawalExecutionPolicy_earningChain));
         require(

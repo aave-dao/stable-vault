@@ -8,15 +8,16 @@ import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessMana
 import {IDepositPolicy} from "src/interfaces/IDepositPolicy.sol";
 import {RateLimitBucketLib} from "src/libraries/RateLimitBucketLib.sol";
 import {Multicall} from "src/misc/Multicall.sol";
+import {GlobalRateLimitedPolicy} from "src/policies/base/GlobalRateLimitedPolicy.sol";
 import {Errors} from "src/types/Errors.sol";
 
 /// @title DepositPolicy
 /// @author Aave Labs
-/// @notice Per-asset rate-limited deposit policy. Each asset has a deposit limit defined by a max capacity and a
-/// per-second refill rate; deposits consume from the available capacity and revert when it is exhausted. Assets
-/// default to a zero-capacity bucket (fully rate-limited) until operator configures one; setting capacity to max
-/// uint128 removes the limit entirely.
-contract DepositPolicy is AccessManaged, Multicall, IDepositPolicy {
+/// @notice Rate-limited deposit policy combining per-asset buckets with a global bucket. Each asset has its own bucket
+/// denominated in the asset's native decimals; the global bucket bounds total deposit throughput across all assets,
+/// with amounts normalized to 18 decimals (the maximum supported asset decimals). All buckets default to zero capacity
+/// (fully rate-limited) until operator configures them; setting capacity to max uint128 removes the limit entirely.
+contract DepositPolicy is AccessManaged, GlobalRateLimitedPolicy, Multicall, IDepositPolicy {
     using RateLimitBucketLib for RateLimitBucketLib.Bucket;
 
     address internal immutable POLICY_APPLIER;
@@ -35,6 +36,18 @@ contract DepositPolicy is AccessManaged, Multicall, IDepositPolicy {
     /// @notice Emitted when an asset's deposit refill rate is raised.
     event DepositRefillRateRaised(address indexed asset, uint128 oldRefillRate, uint128 newRefillRate);
 
+    /// @notice Emitted when the global deposit capacity is lowered.
+    event GlobalDepositCapacityLowered(uint128 oldCapacity, uint128 newCapacity);
+
+    /// @notice Emitted when the global deposit capacity is raised.
+    event GlobalDepositCapacityRaised(uint128 oldCapacity, uint128 newCapacity);
+
+    /// @notice Emitted when the global deposit refill rate is lowered.
+    event GlobalDepositRefillRateLowered(uint128 oldRefillRate, uint128 newRefillRate);
+
+    /// @notice Emitted when the global deposit refill rate is raised.
+    event GlobalDepositRefillRateRaised(uint128 oldRefillRate, uint128 newRefillRate);
+
     modifier onlyPolicyApplier() {
         require(msg.sender == POLICY_APPLIER, Errors.NotAuthorized());
         _;
@@ -52,12 +65,14 @@ contract DepositPolicy is AccessManaged, Multicall, IDepositPolicy {
     /// @inheritdoc IDepositPolicy
     function applyDepositPolicy(DepositIntent calldata deposit) external override onlyPolicyApplier {
         _buckets[deposit.asset].consume(deposit.amount);
+        _consumeGlobalBucket(deposit.asset, deposit.amount);
         emit DepositPolicyApplied(deposit.caller, deposit.user, deposit.asset, deposit.amount);
     }
 
     /// @inheritdoc IDepositPolicy
     function previewDepositPolicy(DepositIntent calldata deposit) external view override returns (bool) {
-        return _buckets[deposit.asset].canConsume(deposit.amount);
+        return
+            _buckets[deposit.asset].canConsume(deposit.amount) && _canConsumeGlobalBucket(deposit.asset, deposit.amount);
     }
 
     /// @notice Returns the current deposit-limit bucket for an asset.
@@ -95,5 +110,34 @@ contract DepositPolicy is AccessManaged, Multicall, IDepositPolicy {
         uint128 oldRefillRate = _buckets[asset].refillRate;
         _buckets[asset].lowerRefillRate(newRefillRate);
         emit DepositRefillRateLowered(asset, oldRefillRate, newRefillRate);
+    }
+
+    /// @notice Returns the current global deposit bucket shared across all assets.
+    function getGlobalDepositLimit() external view returns (RateLimitBucketLib.Bucket memory) {
+        return _globalBucketStorage();
+    }
+
+    /// @notice Raises the global deposit capacity. Use max uint128 to remove the limit.
+    /// @dev Starting with a full bucket, a caller could extract up to `2 * capacity` over
+    /// a `capacity / refillRate`-second interval: they can consume the full bucket at the start of the interval and
+    /// then match the refill rate for the remaining time. Set `capacity` accordingly.
+    function raiseGlobalDepositCapacity(uint128 newCapacity) external restricted {
+        emit GlobalDepositCapacityRaised(_raiseGlobalBucketCapacity(newCapacity), newCapacity);
+    }
+
+    /// @notice Lowers the global deposit capacity. `newCapacity = 0` fully rate-limits deposits across all assets.
+    function lowerGlobalDepositCapacity(uint128 newCapacity) external restricted {
+        emit GlobalDepositCapacityLowered(_lowerGlobalBucketCapacity(newCapacity), newCapacity);
+    }
+
+    /// @notice Raises the global deposit refill rate.
+    /// @dev Reverts when the global capacity is unlimited, since the rate must stay zero in that case.
+    function raiseGlobalDepositRefillRate(uint128 newRefillRate) external restricted {
+        emit GlobalDepositRefillRateRaised(_raiseGlobalBucketRefillRate(newRefillRate), newRefillRate);
+    }
+
+    /// @notice Lowers the global deposit refill rate. `newRefillRate = 0` stops the refill.
+    function lowerGlobalDepositRefillRate(uint128 newRefillRate) external restricted {
+        emit GlobalDepositRefillRateLowered(_lowerGlobalBucketRefillRate(newRefillRate), newRefillRate);
     }
 }

@@ -74,18 +74,22 @@
       "registerOnGateway": true
     },
     "fundsBridgingPolicy": {
+      "globalLimit": {
+        "capacity": "2000000000000000000000000", // 2,000,000 (18 decimals, normalized cross-asset)
+        "refillRate": "23148148148148148148" // 2,000,000/day (18 decimals)
+      },
       "perAssetLimits": {
         "gho": {
-          "capacity": "1000000000000000000000000", // 1,000,000 GHO
-          "refillRate": "11574074074074074074" // 1,000,000 GHO/day
+          "capacity": "2000000000000000000000000", // 2,000,000 GHO
+          "refillRate": "23148148148148148148" // 2,000,000 GHO/day
         },
         "usdc": {
-          "capacity": "1000000000000", // 1,000,000 USDC
-          "refillRate": "11574074" // 1,000,000 USDC/day
+          "capacity": "2000000000000", // 2,000,000 USDC
+          "refillRate": "23148148" // 2,000,000 USDC/day
         },
         "usdt": {
-          "capacity": "1000000000000", // 1,000,000 USDT
-          "refillRate": "11574074" // 1,000,000 USDT/day
+          "capacity": "2000000000000", // 2,000,000 USDT
+          "refillRate": "23148148" // 2,000,000 USDT/day
         }
       }
     },
@@ -129,6 +133,10 @@
     "chainlinkBundleAggregatorProxy": "0xA8eB7776952b3a86CD01b15563764c4b956E8504",
     "sequencerUptimeFeed": "0xFdB631F5EE196F0ed6FAa767959853A9F217697D",
     "depositPolicy": {
+      "globalLimit": {
+        "capacity": "250000000000000000000000", // 250,000 (18 decimals, normalized cross-asset)
+        "refillRate": "11574074074074074074" // 1,000,000/day (18 decimals)
+      },
       "perAssetLimits": {
         "gho": {
           "capacity": "250000000000000000000000", // 250,000 GHO
@@ -145,6 +153,10 @@
       }
     },
     "fundsBridgingPolicy": {
+      "globalLimit": {
+        "capacity": "1000000000000000000000000", // 1,000,000 (18 decimals, normalized cross-asset)
+        "refillRate": "11574074074074074074" // 1,000,000/day (18 decimals)
+      },
       "perAssetLimits": {
         "gho": {
           "capacity": "1000000000000000000000000", // 1,000,000 GHO
