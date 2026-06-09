@@ -117,6 +117,10 @@ RESTART_ANVIL=false ./run-adi-pigeon-fork-test.sh
 ETH_FORK_BLOCK=25196860 ARB_FORK_BLOCK=467697210 ./run-adi-pigeon-fork-test.sh
 ```
 
+The default fork blocks are chosen per `ADI_DEPLOYMENT_ENV` (preprod and prod were
+deployed at different times, so each pins its own post-handoff block). Override
+`ETH_FORK_BLOCK` / `ARB_FORK_BLOCK` to fork elsewhere.
+
 `ETH_FORK_RPC` and `ARB_FORK_RPC` default to `http://127.0.0.1:8545` and
 `http://127.0.0.1:8546`, or to the ports set with `ETH_PORT` and `ARB_PORT`.
 They are the local Anvil RPCs used by Forge. `ETH_FORK_URL` and `ARB_FORK_URL`

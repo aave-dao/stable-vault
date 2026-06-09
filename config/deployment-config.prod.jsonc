@@ -70,7 +70,7 @@
     "ccipRouterAddress": "0x80226fc0Ee2b096224EeAc085Bb9a8cba1146f7D",
     "aaveV3PoolAddressesProvider": "0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e",
     "adi": {
-      "crossChainController": "0x0000000000000000000000000000000000000000", // TODO: Set a.DI CCC address
+      "crossChainController": "0x4ca52093271fd9243E4878f28D58fBc4AFc8a98b",
       "registerOnGateway": true
     },
     "fundsBridgingPolicy": {
@@ -119,8 +119,8 @@
     },
     "ccipRouterAddress": "0x141fa059441E0ca23ce184B6A78bafD2A517DdE8",
     "adi": {
-      "crossChainController": "0x0000000000000000000000000000000000000000",
-      "registerOnGateway": false
+      "crossChainController": "0x61B007d27D4E191BD991455649B1c0289C5388F3",
+      "registerOnGateway": true
     },
     "defaultMaxPerSecondRate": "1000000005781378656804591713",
     "defaultSubVaultPerSecondRate": "1000000001243680656318820313",
