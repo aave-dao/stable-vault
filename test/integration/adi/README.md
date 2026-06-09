@@ -114,8 +114,12 @@ ADI_DEPLOYMENT_ENV=prod ./run-adi-pigeon-fork-test.sh
 ETH_PORT=9545 ARB_PORT=9546 ./run-adi-pigeon-fork-test.sh
 ENV_FILE=.env.forktest ./run-adi-pigeon-fork-test.sh
 RESTART_ANVIL=false ./run-adi-pigeon-fork-test.sh
-ETH_FORK_BLOCK=25281550 ARB_FORK_BLOCK=471767000 ./run-adi-pigeon-fork-test.sh
+ETH_FORK_BLOCK=25196860 ARB_FORK_BLOCK=467697210 ./run-adi-pigeon-fork-test.sh
 ```
+
+The default fork blocks are chosen per `ADI_DEPLOYMENT_ENV` (preprod and prod were
+deployed at different times, so each pins its own post-handoff block). Override
+`ETH_FORK_BLOCK` / `ARB_FORK_BLOCK` to fork elsewhere.
 
 `ETH_FORK_RPC` and `ARB_FORK_RPC` default to `http://127.0.0.1:8545` and
 `http://127.0.0.1:8546`, or to the ports set with `ETH_PORT` and `ARB_PORT`.

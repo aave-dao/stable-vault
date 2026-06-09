@@ -48,8 +48,20 @@ ETH_PORT="${ETH_PORT:-8545}"
 ARB_PORT="${ARB_PORT:-8546}"
 ETH_FORK_RPC="${ETH_FORK_RPC:-http://127.0.0.1:${ETH_PORT}}"
 ARB_FORK_RPC="${ARB_FORK_RPC:-http://127.0.0.1:${ARB_PORT}}"
-ETH_FORK_BLOCK="${ETH_FORK_BLOCK:-25281550}"
-ARB_FORK_BLOCK="${ARB_FORK_BLOCK:-471767000}"
+# Default fork blocks are per-env: each must be pinned after that env's a.DI owner/guardian
+# handoff but before its Stable Vaults contracts were deployed on-chain, so the deploy fork
+# tests' predicted CREATE3 addresses are still empty. Forking after a real deploy trips the
+# idempotency code-hash check when on-chain bytecode drifts from the current repo.
+case "$ADI_DEPLOYMENT_ENV" in
+  prod)
+    ETH_FORK_BLOCK="${ETH_FORK_BLOCK:-25281550}"
+    ARB_FORK_BLOCK="${ARB_FORK_BLOCK:-471767000}"
+    ;;
+  *)
+    ETH_FORK_BLOCK="${ETH_FORK_BLOCK:-25196860}"
+    ARB_FORK_BLOCK="${ARB_FORK_BLOCK:-467697210}"
+    ;;
+esac
 RUN_DIR="${RUN_DIR:-$ADI_DEPLOY_DIR/.forktest}"
 
 MATCH_CONTRACT="${MATCH_CONTRACT:-AdiAdapterPigeon|ForkDeployPreprod|FullSystemPreprodFork}"
