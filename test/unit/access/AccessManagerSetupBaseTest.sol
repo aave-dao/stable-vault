@@ -437,6 +437,26 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         }
     }
 
+    function test_allRoles_guardianTierMatchesDelayTier() public view {
+        RolesConfig.Role[] memory roles = RolesConfig.getAllFunctionBasedRoles();
+        for (uint256 i = 0; i < roles.length; i++) {
+            string memory selector = vm.toString(roles[i].selector);
+            if (roles[i].delay == RolesConfig.NO_DELAY) {
+                assertEq(
+                    roles[i].guardianRoleId,
+                    RolesConfig.OPERATIONAL_ROLE_GUARDIAN_ROLE,
+                    string.concat("Instant role must use the operational guardian ", selector)
+                );
+            } else {
+                assertEq(
+                    roles[i].guardianRoleId,
+                    RolesConfig.ADMIN_ROLE_GUARDIAN_ROLE,
+                    string.concat("Delayed role must use the admin guardian ", selector)
+                );
+            }
+        }
+    }
+
     function test_accessManagerTargetAdminDelay() public view {
         uint32 delay = IAccessManager(_accessManager()).getTargetAdminDelay(address(IAccessManager(_accessManager())));
         assertEq(delay, CRITICAL_DELAY);

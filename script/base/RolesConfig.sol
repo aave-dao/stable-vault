@@ -370,7 +370,7 @@ abstract contract RolesConfig is DeploymentConfig {
             roleId: _selectorToRoleId(selector),
             selector: selector,
             delay: NO_DELAY,
-            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
             hasCriticalRisk: false
         });
     }
