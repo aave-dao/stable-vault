@@ -338,63 +338,28 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
                 })
             );
 
-        _adiHelper.helpMultiBridge(
-            AdiHelper.MultiBridgeArgs({
-                dstForkId: _ethFork,
-                dstCcipRouter: ETH_CCIP_ROUTER,
-                dstCcipChainSelector: ETH_CCIP_CHAIN_SELECTOR,
-                srcCcipOnRamp: address(0),
-                dstLzEndpoint: address(0),
-                srcHlMailbox: address(0),
-                dstHlMailbox: address(0),
-                logs: burnLogs
-            })
-        );
-        vm.selectFork(_ethFork);
-        assertEq(_accounting.iouTokenManager.getLockedBalance(), iouAmountRay, "single relay should not burn IOUs");
-        assertEq(
-            _accounting.iouToken.balanceOf(address(_accounting.iouTokenManager)),
-            iouAmountRay,
-            "single relay changed locked IOU balance"
-        );
-
-        _adiHelper.helpMultiBridge(
-            AdiHelper.MultiBridgeArgs({
-                dstForkId: _ethFork,
-                dstCcipRouter: address(0),
-                dstCcipChainSelector: 0,
-                srcCcipOnRamp: address(0),
-                dstLzEndpoint: LZ_ENDPOINT_V2,
-                srcHlMailbox: address(0),
-                dstHlMailbox: address(0),
-                logs: burnLogs
-            })
-        );
-        vm.selectFork(_ethFork);
-        assertEq(_accounting.iouTokenManager.getLockedBalance(), 0, "second relay should burn locked IOUs");
-        assertEq(_accounting.iouToken.balanceOf(address(_accounting.iouTokenManager)), 0, "manager still holds IOUs");
-        assertEq(_accounting.iouToken.totalSupply(), 0, "accounting IOU supply not burned");
-
-        _adiHelper.helpMultiBridge(
-            AdiHelper.MultiBridgeArgs({
-                dstForkId: _ethFork,
-                dstCcipRouter: address(0),
-                dstCcipChainSelector: 0,
-                srcCcipOnRamp: address(0),
-                dstLzEndpoint: address(0),
-                srcHlMailbox: ARB_HL_MAILBOX,
-                dstHlMailbox: ETH_HL_MAILBOX,
-                logs: burnLogs
-            })
-        );
-        vm.selectFork(_ethFork);
-        assertEq(_accounting.iouTokenManager.getLockedBalance(), 0, "extra relay should not relock or reburn IOUs");
-        assertEq(
-            _accounting.iouToken.balanceOf(address(_accounting.iouTokenManager)),
-            0,
-            "extra relay changed manager IOU balance"
-        );
-        assertEq(_accounting.iouToken.totalSupply(), 0, "extra relay changed accounting IOU supply");
+        // Relay the burn one bridge at a time: the locked accounting IOUs burn only once the receiver quorum is met,
+        // and over-quorum confirmations neither reburn nor relock. Quorum is read on-chain so this holds for both
+        // 2-of-3 (preprod) and 3-of-3 (prod/canary).
+        uint256 quorum = _arbToEthQuorum();
+        for (uint256 confirmations = 1; confirmations <= 3; confirmations++) {
+            _relayArbToEthSingleAmb(burnLogs, confirmations - 1);
+            vm.selectFork(_ethFork);
+            uint256 expectedLocked = confirmations >= quorum ? 0 : iouAmountRay;
+            assertEq(
+                _accounting.iouTokenManager.getLockedBalance(),
+                expectedLocked,
+                "locked IOUs wrong for confirmation stage"
+            );
+            assertEq(
+                _accounting.iouToken.balanceOf(address(_accounting.iouTokenManager)),
+                expectedLocked,
+                "manager IOU balance wrong for confirmation stage"
+            );
+            if (confirmations >= quorum) {
+                assertEq(_accounting.iouToken.totalSupply(), 0, "accounting IOU supply not burned at/after quorum");
+            }
+        }
     }
 
     function test_iouBridge_replacesCcipDataOnlyBridgeWithAdi() public onlyForkTest {

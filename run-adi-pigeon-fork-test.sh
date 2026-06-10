@@ -54,8 +54,8 @@ ARB_FORK_RPC="${ARB_FORK_RPC:-http://127.0.0.1:${ARB_PORT}}"
 # idempotency code-hash check when on-chain bytecode drifts from the current repo.
 case "$ADI_DEPLOYMENT_ENV" in
   prod)
-    ETH_FORK_BLOCK="${ETH_FORK_BLOCK:-25281550}"
-    ARB_FORK_BLOCK="${ARB_FORK_BLOCK:-471767000}"
+    ETH_FORK_BLOCK="${ETH_FORK_BLOCK:-25289990}"
+    ARB_FORK_BLOCK="${ARB_FORK_BLOCK:-472172000}"
     ;;
   *)
     ETH_FORK_BLOCK="${ETH_FORK_BLOCK:-25196860}"

@@ -90,50 +90,19 @@ contract AdiAdapterPigeonDelivery is AdiAdapterPigeonLocalForkBase {
 
         assertGe(_adiHelper.countSuccessfulForwards(logs), 2, "ARB->ETH should meet forwarding threshold");
 
+        uint256 quorum = _arbToEthQuorum();
         vm.selectFork(_ethFork);
         assertEq(_ethGateway.receiveCount(), 0, "ETH gateway should not receive before quorum");
 
-        _adiHelper.helpMultiBridge(
-            AdiHelper.MultiBridgeArgs({
-                dstForkId: _ethFork,
-                dstCcipRouter: ETH_CCIP_ROUTER,
-                dstCcipChainSelector: ETH_CCIP_CHAIN_SELECTOR,
-                srcCcipOnRamp: address(0),
-                dstLzEndpoint: address(0),
-                srcHlMailbox: address(0),
-                dstHlMailbox: address(0),
-                logs: logs
-            })
-        );
-        assertEq(_ethGateway.receiveCount(), 0, "single-bridge relay should not satisfy quorum");
-
-        _adiHelper.helpMultiBridge(
-            AdiHelper.MultiBridgeArgs({
-                dstForkId: _ethFork,
-                dstCcipRouter: address(0),
-                dstCcipChainSelector: 0,
-                srcCcipOnRamp: address(0),
-                dstLzEndpoint: LZ_ENDPOINT_V2,
-                srcHlMailbox: address(0),
-                dstHlMailbox: address(0),
-                logs: logs
-            })
-        );
-        assertEq(_ethGateway.receiveCount(), 1, "ETH gateway should receive after second bridge");
-
-        _adiHelper.helpMultiBridge(
-            AdiHelper.MultiBridgeArgs({
-                dstForkId: _ethFork,
-                dstCcipRouter: address(0),
-                dstCcipChainSelector: 0,
-                srcCcipOnRamp: address(0),
-                dstLzEndpoint: address(0),
-                srcHlMailbox: ARB_HL_MAILBOX,
-                dstHlMailbox: ETH_HL_MAILBOX,
-                logs: logs
-            })
-        );
-        assertEq(_ethGateway.receiveCount(), 1, "extra bridge relay should not duplicate gateway receive");
+        // Relay one bridge at a time: the gateway receives exactly once, when the quorum-th confirmation lands, and
+        // over-quorum relays do not duplicate the receive. Quorum is read on-chain (2-of-3 preprod, 3-of-3
+        // prod/canary).
+        for (uint256 confirmations = 1; confirmations <= 3; confirmations++) {
+            _relayArbToEthSingleAmb(logs, confirmations - 1);
+            vm.selectFork(_ethFork);
+            uint256 expected = confirmations >= quorum ? 1 : 0;
+            assertEq(_ethGateway.receiveCount(), expected, "gateway receiveCount wrong for confirmation stage");
+        }
         assertEq(abi.decode(_ethGateway.lastData(), (string)), "hello-quorum", "unexpected message");
     }
 }

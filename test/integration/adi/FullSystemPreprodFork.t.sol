@@ -52,12 +52,6 @@ contract FullSystemPreprodFork is AdiAdapterPigeonLocalForkBase {
     address internal _earnAdapter;
     address internal _earnUsdc; // earning-chain payout asset, from the deploy config
 
-    enum BridgeAmb {
-        Ccip,
-        LayerZero,
-        Hyperlane
-    }
-
     function setUp() public override {
         if (!vm.envOr("FORK_TEST", false)) {
             return;
@@ -125,30 +119,23 @@ contract FullSystemPreprodFork is AdiAdapterPigeonLocalForkBase {
         _exchangeEarningIousAndBurnBack();
     }
 
-    /// @notice Stage the ARB->ETH bridge delivery one a.DI adapter at a time against the deployed earning chain: a
-    /// single confirmation stays below the 2-of-3 quorum (no mint), the second reaches quorum (mint), and a third,
-    /// over-quorum delivery is recorded without minting again (a.DI envelope replay protection).
+    /// @notice Stage the ARB->ETH bridge delivery one a.DI adapter at a time against the deployed earning chain: each
+    /// confirmation below the receiver quorum mints nothing, the quorum-th confirmation mints, and any over-quorum
+    /// confirmation is recorded without minting again (a.DI envelope replay protection). The quorum is read on-chain so
+    /// this holds for both 2-of-3 (preprod) and 3-of-3 (prod/canary).
     function test_bridge_quorumStagedThenNoReplay() external onlyForkTest {
         Vm.Log[] memory bridgeLogs = _depositRequestAndBridge();
+        uint256 quorum = _arbToEthQuorum();
 
-        // Below quorum: CCIP alone is one confirmation, short of requiredConfirmations = 2 on Ethereum.
-        _relayBridgeAmb(bridgeLogs, BridgeAmb.Ccip);
-        vm.selectFork(_ethFork);
-        assertEq(IERC20(_earnIouToken).balanceOf(_user), 0, "earning IOUs minted below quorum");
-        assertEq(IERC20(_earnIouToken).totalSupply(), 0, "earning IOU supply non-zero below quorum");
-
-        // Quorum reached: LayerZero is the second distinct confirmation, so the earning chain mints.
-        _relayBridgeAmb(bridgeLogs, BridgeAmb.LayerZero);
-        vm.selectFork(_ethFork);
-        assertEq(IERC20(_earnIouToken).balanceOf(_user), WITHDRAWAL_RAY, "earning IOUs not minted at quorum");
-        assertEq(IERC20(_earnIouToken).totalSupply(), WITHDRAWAL_RAY, "earning IOU supply wrong at quorum");
-
-        // Over quorum / replay: Hyperlane arrives after the envelope already executed; it is recorded but does not
-        // mint.
-        _relayBridgeAmb(bridgeLogs, BridgeAmb.Hyperlane);
-        vm.selectFork(_ethFork);
-        assertEq(IERC20(_earnIouToken).balanceOf(_user), WITHDRAWAL_RAY, "over-quorum delivery minted again");
-        assertEq(IERC20(_earnIouToken).totalSupply(), WITHDRAWAL_RAY, "over-quorum delivery changed earning supply");
+        for (uint256 confirmations = 1; confirmations <= 3; confirmations++) {
+            _relayArbToEthSingleAmb(bridgeLogs, confirmations - 1);
+            vm.selectFork(_ethFork);
+            uint256 expected = confirmations >= quorum ? WITHDRAWAL_RAY : 0;
+            assertEq(
+                IERC20(_earnIouToken).balanceOf(_user), expected, "earning IOU balance wrong for confirmation stage"
+            );
+            assertEq(IERC20(_earnIouToken).totalSupply(), expected, "earning IOU supply wrong for confirmation stage");
+        }
     }
 
     /// @dev Accounting (Arbitrum) -> earning (Ethereum): deposit, request withdrawal, lock + bridge the IOUs through
@@ -213,22 +200,6 @@ contract FullSystemPreprodFork is AdiAdapterPigeonLocalForkBase {
         assertEq(_adiHelper.countSuccessfulForwards(bridgeLogs), 3, "ARB->ETH bridge should forward via all 3 adapters");
         assertEq(IERC20(_accIouToken).balanceOf(_user), 0, "accounting IOUs not locked on bridge");
         assertEq(IouTokenManager(_accIouTokenManager).getLockedBalance(), WITHDRAWAL_RAY, "IOUs not locked");
-    }
-
-    /// @dev Relay only a single AMB's leg of an ARB->ETH a.DI envelope by disabling the other two routers/endpoints.
-    function _relayBridgeAmb(Vm.Log[] memory bridgeLogs, BridgeAmb amb) internal {
-        _adiHelper.helpMultiBridge(
-            AdiHelper.MultiBridgeArgs({
-                dstForkId: _ethFork,
-                dstCcipRouter: amb == BridgeAmb.Ccip ? ETH_CCIP_ROUTER : address(0),
-                dstCcipChainSelector: amb == BridgeAmb.Ccip ? ETH_CCIP_CHAIN_SELECTOR : uint64(0),
-                srcCcipOnRamp: address(0),
-                dstLzEndpoint: amb == BridgeAmb.LayerZero ? LZ_ENDPOINT_V2 : address(0),
-                srcHlMailbox: amb == BridgeAmb.Hyperlane ? ARB_HL_MAILBOX : address(0),
-                dstHlMailbox: amb == BridgeAmb.Hyperlane ? ETH_HL_MAILBOX : address(0),
-                logs: bridgeLogs
-            })
-        );
     }
 
     /// @dev Earning (Ethereum) -> accounting (Arbitrum): exchange the earning IOUs for assets (burns them locally and
