@@ -901,6 +901,10 @@ contract StableVault is
         return Math.max(balanceRay, position.originalDepositRay);
     }
 
+    /// @notice The returned value can be slightly underestimated. Original deposits per sub-vault are not tracked, and
+    /// the sum(max(totalShare * rate, originalDeposit per sub-vault)) can be higher than the max(sum(totalShare *
+    /// rate), originalDeposit global). However this divergence is minimal, and bounded by sum(originalDeposit -
+    /// totalShare * rate) for positions where originalDeposit > totalShare * rate.
     function _getActiveSubVaultsObligations() internal view returns (uint256) {
         uint256 activeSubVaultsObligations;
         uint256 activeSubVaultsCount = $storage().activeSubVaultsIds.length;
