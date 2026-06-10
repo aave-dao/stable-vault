@@ -12,6 +12,7 @@ import {AdiAdapter} from "src/bridging/adi/AdiAdapter.sol";
 import {BaseChainGateway} from "src/core/BaseChainGateway.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 
+import {AdiHandoffSimulator} from "./AdiHandoffSimulator.sol";
 import {AccountingChainForkHarness, EarningChainForkHarness} from "./PreprodForkHarnesses.sol";
 
 interface ICccSenders {
@@ -22,7 +23,7 @@ interface ICccSenders {
 /// handoff has already executed, and checks that the deterministic AccessManager / AdiAdapter land at the addresses
 /// a.DI handed control to and that the deployed adapter is wired for bridging. Skipped unless FORK_TEST=true; run via
 /// run-adi-pigeon-fork-test.sh, which boots the forks and points ETH_FORK_RPC / ARB_FORK_RPC at them.
-contract ForkDeployPreprod is Test {
+contract ForkDeployPreprod is Test, AdiHandoffSimulator {
     uint256 internal constant ETH_CHAIN_ID = 1;
     uint256 internal constant ARB_CHAIN_ID = 42161;
 
@@ -46,6 +47,12 @@ contract ForkDeployPreprod is Test {
         deal(deployment.usdc(), deployer, 1_000e6);
         deal(deployment.usdt(), deployer, 1_000e6);
 
+        // Un-finalized a.DI (e.g. canary) keeps owner/guardian on the deployer EOA; finalize on the fork so the
+        // deploy's _validateAdiConfiguration passes. No-op for already-finalized environments (preprod/prod).
+        _finalizeAdiHandoffOnForkIfNeeded(
+            deployment.adiCccAddr(), deployment.accessManagerAddr(), deployment.adiAdapterAddr()
+        );
+
         deployment.run();
 
         _assertCoreAddresses(deployment.adiCccAddr(), deployment.accessManagerAddr(), deployment.adiAdapterAddr());
@@ -66,6 +73,12 @@ contract ForkDeployPreprod is Test {
         deal(deployment.gho(), deployer, 1_000e18);
         deal(deployment.usdc(), deployer, 1_000e6);
         deal(deployment.usdt(), deployer, 1_000e6);
+
+        // Un-finalized a.DI (e.g. canary) keeps owner/guardian on the deployer EOA; finalize on the fork so the
+        // deploy's _validateAdiConfiguration passes. No-op for already-finalized environments (preprod/prod).
+        _finalizeAdiHandoffOnForkIfNeeded(
+            deployment.adiCccAddr(), deployment.accessManagerAddr(), deployment.adiAdapterAddr()
+        );
 
         deployment.run();
 

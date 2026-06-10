@@ -104,6 +104,10 @@ contract AccountingChainForkHarness is AccountingChainDeployment {
         return _adiCrossChainController();
     }
 
+    function mainAdminAddr() external view returns (address) {
+        return _getProfile__MainAdmin();
+    }
+
     function gatewayAddr() external view returns (address) {
         return getGatewayAddress(_deployer());
     }

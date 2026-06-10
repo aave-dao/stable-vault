@@ -17,6 +17,8 @@ import {Constants} from "src/types/Constants.sol";
 import {MockAccessManager} from "test/mocks/MockAccessManager.sol";
 import {MockTransferHelper} from "test/mocks/MockTransferHelper.sol";
 
+import {AdiHandoffSimulator} from "./AdiHandoffSimulator.sol";
+
 import {AdiHelper} from "pigeon/src/adi/AdiHelper.sol";
 import {ArbitrumNativeHelper} from "pigeon/src/arbitrum/ArbitrumNativeHelper.sol";
 import {CcipHelper} from "pigeon/src/ccip/CcipHelper.sol";
@@ -100,7 +102,7 @@ contract RecordingGateway is IChainGateway {
 }
 
 /// @dev Shared fork setup, Pigeon helpers, and helpers for local aDI + Stable Vaults `AdiAdapter` fork tests.
-abstract contract AdiAdapterPigeonLocalForkBase is Test {
+abstract contract AdiAdapterPigeonLocalForkBase is Test, AdiHandoffSimulator {
     uint256 internal constant ETH_CHAIN_ID = 1;
     uint256 internal constant ARB_CHAIN_ID = 42161;
     uint256 internal constant DEFAULT_GAS_LIMIT = 200_000;
