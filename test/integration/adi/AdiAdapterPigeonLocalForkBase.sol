@@ -5,6 +5,7 @@ pragma solidity ^0.8.22;
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ICrossChainForwarder} from "aave-delivery-infrastructure/contracts/interfaces/ICrossChainForwarder.sol";
+import {ICrossChainReceiver} from "aave-delivery-infrastructure/contracts/interfaces/ICrossChainReceiver.sol";
 import {Envelope, Transaction} from "aave-delivery-infrastructure/contracts/libs/EncodingUtils.sol";
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
@@ -225,6 +226,30 @@ abstract contract AdiAdapterPigeonLocalForkBase is Test, AdiHandoffSimulator {
         HyperlaneHelper hlHelper = new HyperlaneHelper();
         ArbitrumNativeHelper arbHelper = new ArbitrumNativeHelper();
         _adiHelper = new AdiHelper(ccipHelper, lzHelper, hlHelper, arbHelper);
+    }
+
+    /// @dev Relay a single ARB->ETH a.DI bridge leg into the Ethereum CCC (0 = CCIP, 1 = LayerZero, 2 = Hyperlane), so
+    /// quorum-staged tests can deliver confirmations one at a time and assert behavior against the receiver quorum.
+    function _relayArbToEthSingleAmb(Vm.Log[] memory logs, uint256 ambIndex) internal {
+        _adiHelper.helpMultiBridge(
+            AdiHelper.MultiBridgeArgs({
+                dstForkId: _ethFork,
+                dstCcipRouter: ambIndex == 0 ? ETH_CCIP_ROUTER : address(0),
+                dstCcipChainSelector: ambIndex == 0 ? ETH_CCIP_CHAIN_SELECTOR : uint64(0),
+                srcCcipOnRamp: address(0),
+                dstLzEndpoint: ambIndex == 1 ? LZ_ENDPOINT_V2 : address(0),
+                srcHlMailbox: ambIndex == 2 ? ARB_HL_MAILBOX : address(0),
+                dstHlMailbox: ambIndex == 2 ? ETH_HL_MAILBOX : address(0),
+                logs: logs
+            })
+        );
+    }
+
+    /// @dev Required confirmations for ARB->ETH messages on the Ethereum receiver, read on-chain so quorum-staged tests
+    /// track whatever the deployment configured (e.g. 2-of-3 or 3-of-3). Selects the Ethereum fork to read the CCC.
+    function _arbToEthQuorum() internal returns (uint256) {
+        vm.selectFork(_ethFork);
+        return ICrossChainReceiver(_ethCcc).getConfigurationByChain(ARB_CHAIN_ID).requiredConfirmation;
     }
 
     function _configureAdaptersAndAdiPermissions() internal {
