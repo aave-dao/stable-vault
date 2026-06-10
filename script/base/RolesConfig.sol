@@ -362,14 +362,14 @@ abstract contract RolesConfig is DeploymentConfig {
         });
     }
 
-    /// @custom:delay High
+    /// @custom:delay None
     /// @custom:location StableVault
-    function getRole__claimSurplusInterest() internal view returns (Role memory) {
+    function getRole__claimSurplusInterest() internal pure returns (Role memory) {
         bytes4 selector = IStableVault.claimSurplusInterest.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
-            delay: HIGH_DELAY,
+            delay: NO_DELAY,
             guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
             hasCriticalRisk: false
         });
