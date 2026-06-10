@@ -76,6 +76,10 @@
     "saltSeed": "aave.stable-vault.CcipAdapter"
   },
   "AdiAdapter": {
+    "address": "0xaA9269672489e9D39fb11d8e9717681c23Da8696",
+    "saltSeed": "[This was not deployed with the canonical scripts]"
+  },
+  "AdiAdapter__Legacy": {
     "address": "0x6a71b6f6fc30e6ea2e6a49b2223d9d109e2ba7aa",
     "saltSeed": "aave.stable-vault.AdiAdapter"
   },
