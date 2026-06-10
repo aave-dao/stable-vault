@@ -78,6 +78,9 @@ contract FullSystemPreprodFork is AdiAdapterPigeonLocalForkBase {
         earning.redirectOutputTo(EARNING_OUTPUT);
         _earnUsdc = earning.usdc();
         _fundDeployer(earning.deployerAddr(), earning.usdc(), earning.usdt(), address(0));
+        // Un-finalized a.DI (e.g. canary) keeps owner/guardian on the deployer EOA; finalize on the fork so the
+        // deploy validates. No-op for already-finalized environments (preprod/prod).
+        _finalizeAdiHandoffOnForkIfNeeded(_ethCcc, earning.accessManagerAddr(), earning.adiAdapterAddr());
         earning.run();
         _earnIouToken = earning.iouTokenAddr();
         _earnGateway = earning.gatewayAddr();
@@ -94,6 +97,9 @@ contract FullSystemPreprodFork is AdiAdapterPigeonLocalForkBase {
         accounting.redirectOutputTo(ACCOUNTING_OUTPUT);
         _accUsdc = accounting.usdc();
         _fundDeployer(accounting.deployerAddr(), accounting.usdc(), accounting.usdt(), accounting.gho());
+        // Un-finalized a.DI (e.g. canary) keeps owner/guardian on the deployer EOA; finalize on the fork so the
+        // deploy validates. No-op for already-finalized environments (preprod/prod).
+        _finalizeAdiHandoffOnForkIfNeeded(_arbCcc, accounting.accessManagerAddr(), accounting.adiAdapterAddr());
         accounting.run();
         _accVault = accounting.stableVaultAddr();
         _accIouToken = accounting.iouTokenAddr();
