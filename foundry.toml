@@ -46,6 +46,10 @@ runs = 10_000
 test = 'test/gas'
 isolate = true
 
+[etherscan]
+mainnet = { key = "${ETHERSCAN_API_KEY}", chain = 1 }
+arbitrum = { key = "${ETHERSCAN_API_KEY}", chain = 42161 }
+
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
 
 [lint]
