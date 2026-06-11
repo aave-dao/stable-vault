@@ -122,7 +122,7 @@ contract FullSystemPreprodFork is AdiAdapterPigeonLocalForkBase {
     /// @notice Stage the ARB->ETH bridge delivery one a.DI adapter at a time against the deployed earning chain: each
     /// confirmation below the receiver quorum mints nothing, the quorum-th confirmation mints, and any over-quorum
     /// confirmation is recorded without minting again (a.DI envelope replay protection). The quorum is read on-chain so
-    /// this holds for both 2-of-3 (preprod) and 3-of-3 (prod/canary).
+    /// this holds for both any on-chain quorum (e.g. 3-of-3 on preprod/prod).
     function test_bridge_quorumStagedThenNoReplay() external onlyForkTest {
         Vm.Log[] memory bridgeLogs = _depositRequestAndBridge();
         uint256 quorum = _arbToEthQuorum();
@@ -196,7 +196,7 @@ contract FullSystemPreprodFork is AdiAdapterPigeonLocalForkBase {
         );
         bridgeLogs = vm.getRecordedLogs();
         // ARB->ETH forwards over all three generic a.DI adapters (CCIP + LayerZero + Hyperlane). We assert all three
-        // engaged so a silently broken adapter is caught instead of being masked by the 2-of-3 receiver quorum.
+        // engaged so a silently broken adapter is caught instead of being masked by the receiver quorum.
         assertEq(_adiHelper.countSuccessfulForwards(bridgeLogs), 3, "ARB->ETH bridge should forward via all 3 adapters");
         assertEq(IERC20(_accIouToken).balanceOf(_user), 0, "accounting IOUs not locked on bridge");
         assertEq(IouTokenManager(_accIouTokenManager).getLockedBalance(), WITHDRAWAL_RAY, "IOUs not locked");

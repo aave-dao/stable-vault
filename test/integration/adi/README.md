@@ -10,7 +10,7 @@ live preprod a.DI. They are skipped during a normal `forge test` run unless
 `ForkDeployPreprod` runs each chain's deploy script and checks the deterministic
 AccessManager / AdiAdapter land where the a.DI owner/guardian handoff delegated
 control. `FullSystemPreprodFork` deploys both chains and drives a full deposit ->
-bridge -> exchange -> burn-back round trip (plus a staged 2-of-3 quorum/replay
+bridge -> exchange -> burn-back round trip (plus a staged quorum/replay
 check) through the deployed contracts. Both redirect their deployment output to
 throwaway `deployments/preprod/v1/*.forktest.json` files (gitignored), so they
 never touch the tracked deployment JSONs.

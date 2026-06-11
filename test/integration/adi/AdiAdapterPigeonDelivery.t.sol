@@ -95,7 +95,7 @@ contract AdiAdapterPigeonDelivery is AdiAdapterPigeonLocalForkBase {
         assertEq(_ethGateway.receiveCount(), 0, "ETH gateway should not receive before quorum");
 
         // Relay one bridge at a time: the gateway receives exactly once, when the quorum-th confirmation lands, and
-        // over-quorum relays do not duplicate the receive. Quorum is read on-chain (2-of-3 preprod, 3-of-3
+        // over-quorum relays do not duplicate the receive. Quorum is read on-chain (e.g. 3-of-3
         // prod/canary).
         for (uint256 confirmations = 1; confirmations <= 3; confirmations++) {
             _relayArbToEthSingleAmb(logs, confirmations - 1);
