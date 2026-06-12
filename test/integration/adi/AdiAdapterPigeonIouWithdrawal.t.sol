@@ -340,7 +340,7 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
 
         // Relay the burn one bridge at a time: the locked accounting IOUs burn only once the receiver quorum is met,
         // and over-quorum confirmations neither reburn nor relock. Quorum is read on-chain so this holds for both
-        // 2-of-3 (preprod) and 3-of-3 (prod/canary).
+        // any on-chain quorum (e.g. 3-of-3 on preprod/prod).
         uint256 quorum = _arbToEthQuorum();
         for (uint256 confirmations = 1; confirmations <= 3; confirmations++) {
             _relayArbToEthSingleAmb(burnLogs, confirmations - 1);

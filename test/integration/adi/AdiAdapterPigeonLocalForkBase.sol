@@ -246,7 +246,7 @@ abstract contract AdiAdapterPigeonLocalForkBase is Test, AdiHandoffSimulator {
     }
 
     /// @dev Required confirmations for ARB->ETH messages on the Ethereum receiver, read on-chain so quorum-staged tests
-    /// track whatever the deployment configured (e.g. 2-of-3 or 3-of-3). Selects the Ethereum fork to read the CCC.
+    /// track whatever the deployment configured (e.g. 3-of-3). Selects the Ethereum fork to read the CCC.
     function _arbToEthQuorum() internal returns (uint256) {
         vm.selectFork(_ethFork);
         return ICrossChainReceiver(_ethCcc).getConfigurationByChain(ARB_CHAIN_ID).requiredConfirmation;
