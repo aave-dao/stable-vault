@@ -7,10 +7,17 @@ import {console} from "forge-std/console.sol";
 import {BaseChainDeployment} from "script/base/BaseChainDeployment.sol";
 import {RolesConfig} from "script/base/RolesConfig.sol";
 import {Create3AddressLib} from "script/libraries/Create3AddressLib.sol";
+import {StableVault} from "src/core/accounting/StableVault.sol";
 import {IPolicyRegistry} from "src/interfaces/IPolicyRegistry.sol";
 import {DepositPolicy} from "src/policies/DepositPolicy.sol";
 import {FundsBridgingPolicy} from "src/policies/FundsBridgingPolicy.sol";
 import {WithdrawalExecutionPolicy} from "src/policies/WithdrawalExecutionPolicy.sol";
+
+/// @dev Minimal view of the OZ ProxyAdmin that owns each TransparentUpgradeableProxy. Owner = the
+///      AccessManager, so upgrades are routed through `AccessManager.execute(proxyAdmin, upgradeAndCall…)`.
+interface IProxyAdmin {
+    function upgradeAndCall(address proxy, address implementation, bytes calldata data) external payable;
+}
 
 /// @title  Policy migration base (VA-347) — chain-agnostic logic.
 /// @notice Migrates DepositPolicy / FundsBridgingPolicy / WithdrawalExecutionPolicy to the
@@ -40,6 +47,12 @@ abstract contract PolicyMigrationBase is BaseChainDeployment {
     string constant DEPOSIT_POLICY_SALT_V = "aave.stable-vault.DepositPolicy.b9461591";
     string constant FUNDS_BRIDGING_POLICY_SALT_V = "aave.stable-vault.FundsBridgingPolicy.b9461591";
     string constant WITHDRAWAL_EXECUTION_POLICY_SALT_V = "aave.stable-vault.WithdrawalExecutionPolicy.b9461591";
+    // Accounting-only: new StableVault implementation (proxy-impl upgrade — #351 transfer-cap fix; storage-safe).
+    string constant STABLE_VAULT_IMPL_SALT_V = "aave.stable-vault.StableVault.Implementation.b9461591";
+
+    // ERC-1967 slots (read the live proxy's implementation / admin without an interface).
+    bytes32 constant ERC1967_IMPL_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
+    bytes32 constant ERC1967_ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
 
     // --- chain-specific hooks (implemented by the per-chain concrete) -------------------------------
     /// @dev DepositPolicy exists on the accounting chain only.
@@ -90,6 +103,15 @@ abstract contract PolicyMigrationBase is BaseChainDeployment {
 
     function _newWithdrawalExecutionPolicy() internal view returns (address) {
         return Create3AddressLib.computeCreate3Address(WITHDRAWAL_EXECUTION_POLICY_SALT_V, _deployer());
+    }
+
+    function _newStableVaultImpl() internal view returns (address) {
+        return Create3AddressLib.computeCreate3Address(STABLE_VAULT_IMPL_SALT_V, _deployer());
+    }
+
+    /// @dev The OZ ProxyAdmin that owns the StableVault proxy (read from its ERC-1967 admin slot).
+    function _stableVaultProxyAdmin() internal view returns (address) {
+        return address(uint160(uint256(vm.load(getStableVaultAddress(_deployer()), ERC1967_ADMIN_SLOT))));
     }
 
     function _mainAdmin() internal view returns (address) {
@@ -148,6 +170,28 @@ abstract contract PolicyMigrationBase is BaseChainDeployment {
             )
         });
 
+        // Accounting only: new StableVault implementation. Same constructor args/immutables as the live
+        // proxy (storage-safe logic upgrade — #351 transfer-cap fix). The proxy is repointed to it in steps 2/3.
+        if (_isAccountingChain()) {
+            _deploy_create3({
+                namespacedSaltSeed: STABLE_VAULT_IMPL_SALT_V,
+                deployer: _deployer(),
+                initCode: abi.encodePacked(
+                    type(StableVault).creationCode,
+                    abi.encode(
+                        _configUint(".accountingChain.defaultMaxPerSecondRate"),
+                        getAssetRegistryAddress(_deployer()),
+                        getIouTokenManagerAddress(_deployer()),
+                        getFundsHandlerAddress(_deployer()),
+                        getTransferHelperAddress(_deployer()),
+                        getPriceOracleAddress(_deployer()),
+                        _configUint(".accountingChain.defaultMaxActiveSubVaults"),
+                        getPolicyRegistryAddress(_deployer())
+                    )
+                )
+            });
+        }
+
         vm.stopBroadcast();
 
         if (_hasDepositPolicy()) {
@@ -155,6 +199,9 @@ abstract contract PolicyMigrationBase is BaseChainDeployment {
         }
         console.log("FundsBridgingPolicy (new)      ", _newFundsBridgingPolicy());
         console.log("WithdrawalExecutionPolicy (new)", _newWithdrawalExecutionPolicy());
+        if (_isAccountingChain()) {
+            console.log("StableVault::Implementation new", _newStableVaultImpl());
+        }
         console.log("=> notify the App backend team of these new policy addresses (VA-347).");
     }
 
@@ -206,6 +253,9 @@ abstract contract PolicyMigrationBase is BaseChainDeployment {
         if (_hasDepositPolicy()) {
             require(_newDepositPolicy().code.length != 0, "DepositPolicy not deployed");
         }
+        if (_isAccountingChain()) {
+            require(_newStableVaultImpl().code.length != 0, "StableVault impl not deployed");
+        }
         console.log("verifyDeployed: new policy contracts have code OK");
     }
 
@@ -224,7 +274,13 @@ abstract contract PolicyMigrationBase is BaseChainDeployment {
                 registry.getPolicy(_depositPolicyId()) == _newDepositPolicy(), "registry: deposit policy not repointed"
             );
         }
-        console.log("verify: registry repointed to new policy addresses OK");
+        // Safety gate: the StableVault proxy must now point at the new implementation (accounting only).
+        if (_isAccountingChain()) {
+            address svProxy = getStableVaultAddress(_deployer());
+            address svImpl = address(uint160(uint256(vm.load(svProxy, ERC1967_IMPL_SLOT))));
+            require(svImpl == _newStableVaultImpl(), "StableVault proxy not upgraded to new impl");
+        }
+        console.log("verify: registry repointed + StableVault upgraded OK");
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -286,6 +342,20 @@ abstract contract PolicyMigrationBase is BaseChainDeployment {
         }
         _op(am, registry, abi.encodeCall(IPolicyRegistry.setPolicy, (_bridgePolicyId(), fbp)), doSchedule);
         _op(am, registry, abi.encodeCall(IPolicyRegistry.setPolicy, (_withdrawalExecutionPolicyId(), wep)), doSchedule);
+
+        // 4) Accounting only: upgrade the StableVault proxy to the new implementation. The ProxyAdmin is
+        //    owned by the AccessManager, so this routes as AccessManager → ProxyAdmin.upgradeAndCall and is
+        //    ADMIN_ROLE-gated at CRITICAL (2h) — same window as the wiring above. No re-init (storage-safe).
+        if (_isAccountingChain()) {
+            _op(
+                am,
+                _stableVaultProxyAdmin(),
+                abi.encodeCall(
+                    IProxyAdmin.upgradeAndCall, (getStableVaultAddress(_deployer()), _newStableVaultImpl(), "")
+                ),
+                doSchedule
+            );
+        }
     }
 
     function _bindSelectors(

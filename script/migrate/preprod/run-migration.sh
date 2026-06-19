@@ -192,6 +192,10 @@ if [ "$RUN_DASHBOARD" = 1 ]; then
   FBP=$(grep -oE 'FundsBridgingPolicy \(new\) +0x[0-9a-fA-F]{40}' /tmp/migrate-arbitrum-deploy.log | grep -oE '0x[0-9a-fA-F]{40}')
   WEP=$(grep -oE 'WithdrawalExecutionPolicy \(new\) +0x[0-9a-fA-F]{40}' /tmp/migrate-arbitrum-deploy.log | grep -oE '0x[0-9a-fA-F]{40}')
   [ -n "$DEP$FBP$WEP" ] || fail "could not parse new policy addresses (run with --chains including accounting)"
+  # NOTE: the StableVault impl upgrade is proven on-chain by verify() (proxy → new impl). We deliberately do
+  # NOT re-point its dashboard ::Implementation entry / add an override here: on a fork that triggers noisy
+  # immutable-recovery mismatches. So the dashboard still lists StableVault::Implementation impl_differs — a
+  # known dashboard-side artifact, like AdiAdapter. Real post-migration: update the JSON addr + add the override.
 
   restore_dashboard() {
     git -C "$ROOT" checkout -- deployments/preprod/accounting.json deployments/preprod/earning.json 2>/dev/null || true
