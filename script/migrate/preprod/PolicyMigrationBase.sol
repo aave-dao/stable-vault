@@ -76,19 +76,19 @@ abstract contract PolicyMigrationBase is BaseChainDeployment {
     function _deployContracts() internal override {}
     function _setupContracts() internal override {}
 
-    function _allocatorDepositor() internal view override returns (address) {
+    function _allocatorDepositor() internal pure override returns (address) {
         return address(0);
     }
 
-    function _allocatorWithdrawer() internal view override returns (address) {
+    function _allocatorWithdrawer() internal pure override returns (address) {
         return address(0);
     }
 
-    function _iouTokenManagerVault() internal view override returns (address) {
+    function _iouTokenManagerVault() internal pure override returns (address) {
         return address(0);
     }
 
-    function _aTokenVaultUnderlyings() internal view override returns (address[] memory) {
+    function _aTokenVaultUnderlyings() internal pure override returns (address[] memory) {
         return new address[](0);
     }
 

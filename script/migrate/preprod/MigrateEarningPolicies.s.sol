@@ -57,7 +57,7 @@ contract MigrateEarningPolicies is PolicyMigrationBase {
         return bytes32(0);
     }
 
-    function _depositPolicyApplier() internal view override returns (address) {
+    function _depositPolicyApplier() internal pure override returns (address) {
         return address(0);
     }
 }
