@@ -31,6 +31,8 @@
 #   --start-from <step>     resume at a named step (skip everything before it). Live timelock resume.
 #   --stop-before <step>    stop just before a named step.
 #   --no-va359              skip the VA-359 claimSurplusInterest re-config.
+#   --adi                   run ONLY the AdiCrossChainController function-role bindings (VA-398),
+#                           instead of the policy migration. step names: <label>:adi:{schedule,execute,verify}
 #   --dashboard             (fork only) dashboard consistency check vs prod.
 #   --keep-anvil            (fork only) leave the anvil forks running.
 #   --dump-txs              dump every forge broadcast tx to docs/migration-tx-dump/.
@@ -64,6 +66,8 @@ STOP_BEFORE="${STOP_BEFORE:-}"
 RUN_DASHBOARD=0
 KEEP_ANVIL=0
 RUN_VA359=1
+RUN_POLICY=1   # default: VA-347 policy migration + VA-359 claimSurplusInterest
+RUN_ADI=0      # --adi: instead run ONLY the AdiCrossChainController function-role bindings (VA-398)
 DUMP_TXS=0
 DUMP_DIR="docs/migration-tx-dump"   # gitignored; per-step forge broadcast JSONs + combined all-transactions.json
 VERIFY_CONTRACTS="${VERIFY_CONTRACTS:-}"
@@ -83,6 +87,7 @@ while [ $# -gt 0 ]; do
     --start-from) START_FROM="$2"; shift 2 ;;
     --stop-before) STOP_BEFORE="$2"; shift 2 ;;
     --no-va359) RUN_VA359=0; shift ;;
+    --adi) RUN_ADI=1; RUN_POLICY=0; shift ;;
     --dashboard) RUN_DASHBOARD=1; shift ;;
     --keep-anvil) KEEP_ANVIL=1; shift ;;
     --dump-txs) DUMP_TXS=1; shift ;;
@@ -196,6 +201,7 @@ collect_txs() {
   local copied=0
   for f in broadcast/MigrateAccountingPolicies.s.sol/*/*-latest.json \
            broadcast/MigrateEarningPolicies.s.sol/*/*-latest.json \
+           broadcast/MigrateAdiCccBindings.s.sol/*/*-latest.json \
            broadcast/Va359ClaimSurplusInterest.s.sol/*/*-latest.json; do
     [ -f "$f" ] || continue
     local name; name=$(echo "$f" | sed -E 's#broadcast/(.+)\.s\.sol/([0-9]+)/(.+)-latest\.json#\1__\2__\3#')
@@ -227,8 +233,9 @@ cleanup() {
     # Fork-run broadcast/cache artifacts land under chainId 1/42161 dirs (same as real deploys) — remove
     # them so they can't be mistaken for a real broadcast. On live they are the real receipts → KEEP.
     rm -rf broadcast/MigrateAccountingPolicies.s.sol broadcast/MigrateEarningPolicies.s.sol \
-           broadcast/Va359ClaimSurplusInterest.s.sol cache/MigrateAccountingPolicies.s.sol \
-           cache/MigrateEarningPolicies.s.sol cache/Va359ClaimSurplusInterest.s.sol 2>/dev/null || true
+           broadcast/MigrateAdiCccBindings.s.sol broadcast/Va359ClaimSurplusInterest.s.sol \
+           cache/MigrateAccountingPolicies.s.sol cache/MigrateEarningPolicies.s.sol \
+           cache/MigrateAdiCccBindings.s.sol cache/Va359ClaimSurplusInterest.s.sol 2>/dev/null || true
     rmdir broadcast cache 2>/dev/null || true   # remove if now empty
   fi
   rm -f "$PWFILE_DEPLOYER" "$PWFILE_MAINADMIN" 2>/dev/null || true
@@ -354,6 +361,7 @@ boundary() { # <name> <rpc> <seconds> <delay-label> <next-step>
     [ "$PHASE" = broadcast ] && pre="$pre CONFIRM_LIVE_BROADCAST=YES"
     HALT_RESUME="$pre script/migrate/preprod/run-migration.sh --chains $(chain_flag "$cl") --start-from $5"
     [ "$RUN_VA359" = 0 ] && HALT_RESUME="$HALT_RESUME --no-va359"
+    [ "$RUN_ADI" = 1 ] && HALT_RESUME="$HALT_RESUME --adi"
     log "TIMELOCK ($4): wait $3s (~$(($3/3600))h $((($3%3600)/60))m) of REAL time on live, then resume:"
     printf '    \033[1;33m%s\033[0m\n' "$HALT_RESUME"
     HALT=1
@@ -387,9 +395,23 @@ migrate_va359() { # <rpc> <label>
   [ "$HALT" = 1 ] || ok "[$L] VA-359 complete"
 }
 
+# VA-398: wire the 15 AdiCrossChainController function→role bindings on the SV AccessManager. Copies prod
+# 1:1 (role IDs are selector-derived → env-agnostic). Roles are already configured + granted on preprod, so
+# this is bindings-only: schedule→+2h→execute→verify (no deploy/bucket/high phase).
+migrate_adi() { # <contract> <rpc> <label>
+  local c="$1" rpc="$2" L="$3"
+  log "[$L] AdiCrossChainController bindings (VA-398)"
+  wstep    "$L:adi:schedule" "$c" stepSchedule "$rpc" mainAdmin
+  boundary "$L:adi:wait-critical" "$rpc" "$CRITICAL_DELAY" criticalDelay "$L:adi:execute"
+  wstep    "$L:adi:execute"  "$c" stepExecute "$rpc" mainAdmin
+  rstep    "$L:adi:verify"   "$c" verify "$rpc" "verify:"
+  [ "$HALT" = 1 ] || ok "[$L] ADI bindings complete"
+}
+
 # --- run ------------------------------------------------------------------------------------------
 forge build script/migrate/preprod/MigrateAccountingPolicies.s.sol \
              script/migrate/preprod/MigrateEarningPolicies.s.sol \
+             script/migrate/preprod/MigrateAdiCccBindings.s.sol \
              script/migrate/preprod/Va359ClaimSurplusInterest.s.sol >/dev/null || fail "compile failed"
 
 if [ "$MODE" = fork ]; then
@@ -397,7 +419,7 @@ if [ "$MODE" = fork ]; then
   # REAL chain-ids (1/42161), so they overwrite — and the fork cleanup below deletes — any LIVE broadcast
   # artifacts already sitting there. Refuse to start if such artifacts exist, unless explicitly overridden.
   for d in broadcast/MigrateAccountingPolicies.s.sol broadcast/MigrateEarningPolicies.s.sol \
-           broadcast/Va359ClaimSurplusInterest.s.sol; do
+           broadcast/MigrateAdiCccBindings.s.sol broadcast/Va359ClaimSurplusInterest.s.sol; do
     if [ -e "$d" ] && [ "${FORK_OVERWRITE_BROADCAST:-0}" != 1 ]; then
       fail "fork mode would overwrite/delete existing broadcast artifacts at '$d' (e.g. a live run's records). Move/back them up, or set FORK_OVERWRITE_BROADCAST=1 to proceed anyway."
     fi
@@ -411,10 +433,16 @@ else
   case ",$CHAINS," in *,earning,*)    check_chain "$ETH_RPC" 1     ethereum ;; esac
 fi
 
-case ",$CHAINS," in *,accounting,*) migrate_chain MigrateAccountingPolicies "$ARB_RPC" arbitrum ;; esac
-if [ "$RUN_VA359" = 1 ]; then case ",$CHAINS," in *,accounting,*) migrate_va359 "$ARB_RPC" arbitrum ;; esac; fi
-case ",$CHAINS," in *,earning,*)    migrate_chain MigrateEarningPolicies    "$ETH_RPC" ethereum ;; esac
-if [ "$RUN_VA359" = 1 ]; then case ",$CHAINS," in *,earning,*) migrate_va359 "$ETH_RPC" ethereum ;; esac; fi
+if [ "$RUN_POLICY" = 1 ]; then
+  case ",$CHAINS," in *,accounting,*) migrate_chain MigrateAccountingPolicies "$ARB_RPC" arbitrum ;; esac
+  if [ "$RUN_VA359" = 1 ]; then case ",$CHAINS," in *,accounting,*) migrate_va359 "$ARB_RPC" arbitrum ;; esac; fi
+  case ",$CHAINS," in *,earning,*)    migrate_chain MigrateEarningPolicies    "$ETH_RPC" ethereum ;; esac
+  if [ "$RUN_VA359" = 1 ]; then case ",$CHAINS," in *,earning,*) migrate_va359 "$ETH_RPC" ethereum ;; esac; fi
+fi
+if [ "$RUN_ADI" = 1 ]; then
+  case ",$CHAINS," in *,accounting,*) migrate_adi MigrateAccountingAdiBindings "$ARB_RPC" arbitrum ;; esac
+  case ",$CHAINS," in *,earning,*)    migrate_adi MigrateEarningAdiBindings    "$ETH_RPC" ethereum ;; esac
+fi
 
 # --- optional dashboard convergence check (fork only) ----------------------------------------------
 if [ "$RUN_DASHBOARD" = 1 ]; then
