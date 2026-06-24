@@ -40,6 +40,18 @@ interface IProxyAdmin {
 ///   stepExecuteBuckets()                  [MAIN ADMIN] execute() the bucket inits + addSigner
 ///   verify()                                           (read-only) confirm registry + buckets + roles
 ///
+/// DOWNTIME NOTE — this ordering puts the registry cutover (setPolicy) in the CRITICAL wiring batch, but
+/// the capacity `raise*` ops (+ WEP addSigner) only land 1h later in the HIGH batch. So between
+/// stepExecuteWiringScheduleBuckets() and stepExecuteBuckets() the NEW policies are registry-active but
+/// still at ZERO capacity / no signer → deposits, withdrawals AND bridging are rate-limited (rejected) for
+/// ~1h. This mirrors prod's genesis ordering and keeps the migration to two timelock waits; on preprod the
+/// gap is acceptable. For a ZERO-DOWNTIME variant (worth considering for prod): fully provision the new
+/// policy WHILE the old one is still in the registry — bind roles → raise* capacity → addSigner — and make
+/// the setPolicy cutover the VERY LAST op. A policy's setters touch only its own internal state (no registry
+/// dependency), so the old policy keeps serving until the final flip → no user-facing gap. Cost: an extra
+/// timelock window (~+2h, since setPolicy is CRITICAL) and a sequence that no longer matches prod's genesis,
+/// so it would need its own fork rehearsal.
+///
 /// Salt convention (Alan): deploy-commit-suffixed seeds, suffix = prod's accounting deploy commit
 /// `b9461591` (`git diff b9461591 HEAD -- src/` is empty ⇒ HEAD bytecode == prod). Kept local here; the
 /// canonical Create3AddressBook constants stay clean (prod used those).

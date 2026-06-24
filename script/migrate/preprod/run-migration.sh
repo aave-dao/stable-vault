@@ -267,8 +267,9 @@ file_mtime() { stat -f %m "$1" 2>/dev/null || stat -c %Y "$1"; }
 # True iff forge's broadcast receipts for <script-file> on <chain-id> are all confirmed (status 0x1) and
 # fresh (written after the step started). Lets a post-broadcast Etherscan verification failure be
 # downgraded to a warning instead of aborting a live run whose txs already landed. (mirrors a.DI)
-broadcast_receipts_ok() { # <script-file-basename> <chain-id> <started-at-epoch>
-  local run_file="broadcast/$1/$2/run-latest.json" mtime
+broadcast_receipts_ok() { # <script-file-basename> <chain-id> <started-at-epoch> <sig>
+  # forge writes the broadcast under "<sig>-latest.json" (we invoke with --sig "<fn>()"), NOT run-latest.json.
+  local run_file="broadcast/$1/$2/$4-latest.json" mtime
   [ -f "$run_file" ] || return 1
   mtime="$(file_mtime "$run_file")"
   { [ -n "$mtime" ] && [ "$mtime" -ge "$3" ]; } || return 1
@@ -280,8 +281,8 @@ broadcast_receipts_ok() { # <script-file-basename> <chain-id> <started-at-epoch>
   ' "$run_file"
 }
 
-run_forge() { # <step-name> <logfile|""> <verify-active 0|1> <rpc> <contract> <forge-args...>
-  local name="$1" logf="$2" vfy="$3" rpc="$4" contract="$5"; shift 5
+run_forge() { # <step-name> <logfile|""> <verify-active 0|1> <rpc> <contract> <fn> <forge-args...>
+  local name="$1" logf="$2" vfy="$3" rpc="$4" contract="$5" fn="$6"; shift 6
   local out exit_code=0 started_at
   started_at="$(date +%s)"
   out="$(forge script "$@" 2>&1)" || exit_code=$?
@@ -291,7 +292,7 @@ run_forge() { # <step-name> <logfile|""> <verify-active 0|1> <rpc> <contract> <f
     # and let the operator re-verify with --resume later, rather than aborting mid-migration.
     if [ "$vfy" = 1 ]; then
       local cid; cid="$(cast chain-id --rpc-url "$rpc" 2>/dev/null || true)"
-      if [ -n "$cid" ] && broadcast_receipts_ok "${contract}.s.sol" "$cid" "$started_at"; then
+      if [ -n "$cid" ] && broadcast_receipts_ok "${contract}.s.sol" "$cid" "$started_at" "$fn"; then
         echo "$out" | tail -15
         log "WARNING: Etherscan verification failed for $name, but broadcast receipts are confirmed — continuing."
         UNVERIFIED_STEPS+=("$name (chain $cid): ${contract}.s.sol")
@@ -333,7 +334,7 @@ wstep() { # <name> <contract> <fn> <rpc> <role> [verify] [logfile]
     fi
   fi
   log "[$name] ${contract}.${fn}() ($MODE/$PHASE, sender=$role)"
-  run_forge "$name" "$logf" "$vfy" "$rpc" "$contract" "${args[@]}"
+  run_forge "$name" "$logf" "$vfy" "$rpc" "$contract" "$fn" "${args[@]}"
 }
 
 # rstep — a read-only verify entrypoint. Same in both modes (no signer, no broadcast).
@@ -392,6 +393,15 @@ forge build script/migrate/preprod/MigrateAccountingPolicies.s.sol \
              script/migrate/preprod/Va359ClaimSurplusInterest.s.sol >/dev/null || fail "compile failed"
 
 if [ "$MODE" = fork ]; then
+  # Guard against clobbering real records: fork runs broadcast to broadcast/<script>/<chainId> under the
+  # REAL chain-ids (1/42161), so they overwrite — and the fork cleanup below deletes — any LIVE broadcast
+  # artifacts already sitting there. Refuse to start if such artifacts exist, unless explicitly overridden.
+  for d in broadcast/MigrateAccountingPolicies.s.sol broadcast/MigrateEarningPolicies.s.sol \
+           broadcast/Va359ClaimSurplusInterest.s.sol; do
+    if [ -e "$d" ] && [ "${FORK_OVERWRITE_BROADCAST:-0}" != 1 ]; then
+      fail "fork mode would overwrite/delete existing broadcast artifacts at '$d' (e.g. a live run's records). Move/back them up, or set FORK_OVERWRITE_BROADCAST=1 to proceed anyway."
+    fi
+  done
   case ",$CHAINS," in *,accounting,*) start_anvil 8546 "$ARB_FORK" 42161 arbitrum ;; esac
   case ",$CHAINS," in *,earning,*)    start_anvil 8545 "$ETH_FORK" 1     ethereum ;; esac
   ARB_RPC="http://127.0.0.1:8546"; ETH_RPC="http://127.0.0.1:8545"
