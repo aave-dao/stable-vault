@@ -104,8 +104,8 @@
     "saltSeed": "aave.stable-vault.CcipAdapter"
   },
   "AdiAdapter": {
-    "address": "0xac5a5261de3f71a23b2f5216d740e86ca090e5bd",
-    "saltSeed": "aave.stable-vault.AdiAdapter"
+    "address": "0x5132ce47a5603f5ee862746c364139ad719f2594",
+    "saltSeed": "aave.stable-vault.AdiAdapter.pr349"
   },
   "DepositPolicy": {
     "address": "0x0f7ffbeaf892d79e602083b3b789b4428c785182",
