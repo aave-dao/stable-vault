@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.20;
 
-import {PolicyMigrationBase} from "script/migrate/preprod/PolicyMigrationBase.sol";
+import {PolicyMigrationBase} from "script/migrate/PolicyMigrationBase.sol";
 
 /// @title  Preprod policy migration — EARNING chain (Ethereum).
 /// @notice FundsBridgingPolicy + WithdrawalExecutionPolicy only (no DepositPolicy on the earning chain).
