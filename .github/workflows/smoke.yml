@@ -1,0 +1,152 @@
+name: Smoke
+
+# Post-deploy conformance gate: read live PROD on-chain state and diff it against the JSONC
+# config + roles.json that this branch would produce. Catches config<->chain drift on PRs that
+# touch economic config or roles.
+#
+# Rollout policy (VA-229): ADVISORY-FIRST. The smoke run uses `continue-on-error: true`, so a
+# divergence is reported (logs + sticky PR comment) but does NOT block the merge yet. Once we
+# trust the signal, drop `continue-on-error` to make it a hard gate.
+#
+# Drift caveat: smoke verifies LIVE prod. A PR that changes config *before* the matching deploy
+# will legitimately diverge from chain. Two escape hatches:
+#   - advisory mode (current) never blocks;
+#   - add the `smoke-config-ahead` label to a PR to skip the run entirely for an intended
+#     config-ahead-of-chain change.
+
+on:
+  pull_request:
+    paths:
+      - "config/deployment-config.*.jsonc"
+      - ".github/workflows/tooling/roles-sync/**"
+      - "script/base/RolesConfig.sol"
+      - "script/base/AccessManager*.sol"
+      - "tools/smoke/**"
+      - ".github/workflows/smoke.yml"
+  workflow_dispatch:
+  schedule:
+    # Daily prod drift monitor (08:00 UTC). Surfaces config<->chain divergence even without a PR.
+    - cron: "0 8 * * *"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: smoke-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke-prod:
+    name: Smoke (prod drift)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Skip on forked PRs (no secret access) and on PRs explicitly flagged as config-ahead-of-chain.
+    if: >-
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+      && !contains(github.event.pull_request.labels.*.name, 'smoke-config-ahead')
+    env:
+      ALCHEMY_KEY: ${{ secrets.ALCHEMY_KEY || secrets.ALCHEMY_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Check RPC secret
+        run: |
+          if [ -z "$ALCHEMY_KEY" ]; then
+            echo "Missing ALCHEMY_KEY or ALCHEMY_API_KEY secret for smoke RPC." >&2
+            exit 1
+          fi
+
+      - name: Check dependency access secrets
+        env:
+          DEPENDENCIES_APP_ID: ${{ secrets.DEPENDENCIES_APP_ID }}
+          DEPENDENCIES_PRIVATE_KEY: ${{ secrets.DEPENDENCIES_PRIVATE_KEY }}
+        run: |
+          if [ -z "$DEPENDENCIES_APP_ID" ] || [ -z "$DEPENDENCIES_PRIVATE_KEY" ]; then
+            echo "Missing DEPENDENCIES_APP_ID or DEPENDENCIES_PRIVATE_KEY secret for private dependency access." >&2
+            exit 1
+          fi
+
+      - name: Create dependencies token
+        uses: actions/create-github-app-token@v3
+        id: dependencies-token
+        with:
+          app-id: ${{ secrets.DEPENDENCIES_APP_ID }}
+          private-key: ${{ secrets.DEPENDENCIES_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: |
+            aave-delivery-infrastructure
+          permission-contents: read
+
+      - name: Initialize submodules
+        env:
+          DEPENDENCIES_TOKEN: ${{ steps.dependencies-token.outputs.token }}
+        run: |
+          git config --global url."https://x-access-token:${DEPENDENCIES_TOKEN}@github.com/aave/aave-delivery-infrastructure".insteadOf "https://github.com/aave/aave-delivery-infrastructure"
+          git submodule sync --recursive
+          git submodule update --init --recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install JS deps
+        run: yarn install --frozen-lockfile
+
+      # forge build resolves deployedBytecode so the topology bytecode-hash checks are real
+      # (rather than warning "could not resolve").
+      - name: Build Forge artifacts
+        run: forge build --deny notes
+
+      # roles.json is generated (gitignored). Regenerate it from THIS branch's config so the
+      # AccessManager catalogue reflects the PR's intended roles.
+      - name: Dump roles per env
+        run: yarn roles:dump
+      - name: Build canonical roles.json
+        run: yarn roles:build
+
+      - name: Run smoke against prod
+        id: smoke
+        continue-on-error: true # ADVISORY-FIRST — see header. Drop this to make smoke a hard gate.
+        env:
+          SMOKE_RPC_PROD_ETHEREUM: https://eth-mainnet.g.alchemy.com/v2/${{ env.ALCHEMY_KEY }}
+          SMOKE_RPC_PROD_ARBITRUM: https://arb-mainnet.g.alchemy.com/v2/${{ env.ALCHEMY_KEY }}
+        run: |
+          set -o pipefail
+          yarn smoke:prod --summary 2>&1 | tee smoke-summary.txt
+
+      - name: Build PR comment
+        if: github.event_name == 'pull_request'
+        id: comment
+        run: |
+          status="✅ no drift"
+          if [ "${{ steps.smoke.outcome }}" != "success" ]; then
+            status="⚠️ drift / failures detected (advisory — not blocking)"
+          fi
+          {
+            echo 'body<<SMOKE_EOF'
+            echo "### Smoke (prod drift) — $status"
+            echo ""
+            echo "Live prod on-chain state vs this branch's config/roles. Advisory-only for now."
+            echo "If this PR intentionally lands config ahead of the deploy, add the \`smoke-config-ahead\` label to mute."
+            echo ""
+            echo '```'
+            tail -c 60000 smoke-summary.txt || true
+            echo '```'
+            echo 'SMOKE_EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Post / update sticky comment
+        if: github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: smoke-prod
+          message: ${{ steps.comment.outputs.body }}
