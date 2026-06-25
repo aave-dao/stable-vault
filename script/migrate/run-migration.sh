@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
-# VA-347 / VA-359 preprod policy migration — single harness, two modes.
+# VA-347 / VA-359 policy migration — single harness, three modes (fork / live / tenderly-staging).
 #
 # The SAME forge step entrypoints (MigrateAccountingPolicies / MigrateEarningPolicies /
-# Va359ClaimSurplusInterest) run in both modes — only the wrapper differs:
+# Va359ClaimSurplusInterest, or their *Staging variants) run in every mode — only the wrapper differs:
 #
 #   MODE=fork  (default)  boots anvil forks of the real preprod chains, impersonates the deployer +
 #                         MainAdmin EOAs (--unlocked --sender), and fakes the timelock waits with
@@ -17,11 +17,20 @@
 #                         adi-deploy/scripts/stable-vaults/run-deployment.sh (MODE/PHASE + keystore +
 #                         CONFIRM guard + START_FROM/STOP_BEFORE step gating).
 #
-# Usage:
-#   script/migrate/preprod/run-migration.sh [flags]
+#   MODE=tenderly         drives the STAGING migration (staging config + *Staging concretes, the
+#                         non-blocking cutover-last policy ordering) against the persistent Tenderly
+#                         virtual testnets (RPC_TENDERLY_MAINNET / RPC_TENDERLY_ARBITRUM). Uses fork
+#                         mechanics — impersonates the signers (--unlocked --sender) and warps the
+#                         timelocks (evm_increaseTime) — but against the real vnet RPCs (no anvil), so
+#                         backend can observe the broadcast/timelock state. Funds signers via
+#                         tenderly_setBalance. End-to-end in one invocation; never touches a real chain.
 #
-#   --mode fork|live        (default: fork)
+# Usage:
+#   script/migrate/run-migration.sh [flags]
+#
+#   --mode fork|live|tenderly  (default: fork)
 #   --live                  shorthand for --mode live
+#   --tenderly              shorthand for --mode tenderly (staging migration on Tenderly vnets)
 #   --phase dry-run|broadcast
 #                           default: fork=broadcast, live=dry-run. live broadcast also needs
 #                           CONFIRM_LIVE_BROADCAST=YES.
@@ -53,9 +62,9 @@
 # Requires: foundry (anvil/forge/cast), node, and ALCHEMY_KEY in ./.env (or RPC_MAINNET/RPC_ARBITRUM).
 set -euo pipefail
 
-cd "$(dirname "$0")/../../.."            # repo root (based-boosted-vaults)
+cd "$(dirname "$0")/../.."               # repo root (based-boosted-vaults)
 ROOT="$PWD"
-CONFIG="config/deployment-config.preprod.jsonc"
+CONFIG=""   # set per-mode after arg parsing (preprod for fork/live, staging for tenderly)
 DASHBOARD="${DASHBOARD_REPO:-$ROOT/../stable-vault-dashboard}"
 
 MODE="${MODE:-fork}"
@@ -80,6 +89,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --mode) MODE="$2"; shift 2 ;;
     --live) MODE="live"; shift ;;
+    --tenderly) MODE="tenderly"; shift ;;
     --phase) PHASE="$2"; shift 2 ;;
     --broadcast) PHASE="broadcast"; shift ;;
     --dry-run) PHASE="dry-run"; shift ;;
@@ -91,25 +101,50 @@ while [ $# -gt 0 ]; do
     --dashboard) RUN_DASHBOARD=1; shift ;;
     --keep-anvil) KEEP_ANVIL=1; shift ;;
     --dump-txs) DUMP_TXS=1; shift ;;
-    -h|--help) sed -n '2,60p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,62p' "$0"; exit 0 ;;
     *) echo "unknown arg: $1" >&2; exit 1 ;;
   esac
 done
-
-case "$MODE" in fork|live) ;; *) echo "MODE must be fork or live (got '$MODE')" >&2; exit 1 ;; esac
-if [ -z "$PHASE" ]; then [ "$MODE" = live ] && PHASE="dry-run" || PHASE="broadcast"; fi
-case "$PHASE" in dry-run|broadcast) ;; *) echo "PHASE must be dry-run or broadcast (got '$PHASE')" >&2; exit 1 ;; esac
-[ -z "$VERIFY_CONTRACTS" ] && { [ "$MODE" = live ] && VERIFY_CONTRACTS=true || VERIFY_CONTRACTS=false; }
 
 log()  { printf '\033[1;36m== %s\033[0m\n' "$*"; }
 ok()   { printf '\033[1;32m✓ %s\033[0m\n' "$*"; }
 fail() { printf '\033[1;31m✗ %s\033[0m\n' "$*" >&2; exit 1; }
 lc()   { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
 
+case "$MODE" in fork|live|tenderly) ;; *) echo "MODE must be fork, live, or tenderly (got '$MODE')" >&2; exit 1 ;; esac
+if [ -z "$PHASE" ]; then [ "$MODE" = live ] && PHASE="dry-run" || PHASE="broadcast"; fi
+case "$PHASE" in dry-run|broadcast) ;; *) echo "PHASE must be dry-run or broadcast (got '$PHASE')" >&2; exit 1 ;; esac
+[ -z "$VERIFY_CONTRACTS" ] && { [ "$MODE" = live ] && VERIFY_CONTRACTS=true || VERIFY_CONTRACTS=false; }
+
+# --- mode-specific config + contract set -----------------------------------------------------------
+# tenderly drives the STAGING migration (staging config + *Staging concretes, non-blocking cutover-last);
+# fork/live drive the preprod migration. Only the config path + concrete names differ — the step
+# sequence and forge entrypoints are identical.
+if [ "$MODE" = tenderly ]; then
+  CONFIG="config/deployment-config.staging.jsonc"
+  C_ACCOUNTING="MigrateAccountingPoliciesStaging"
+  C_EARNING="MigrateEarningPoliciesStaging"
+  C_VA359="Va359ClaimSurplusInterestStaging"
+  [ "$RUN_ADI" = 1 ]       && fail "--adi is not used on staging (VA-398 already matches prod 15/15)"
+  [ "$RUN_DASHBOARD" = 1 ] && fail "--dashboard is preprod-fork-only"
+  [ "$KEEP_ANVIL" = 1 ]    && fail "--keep-anvil is fork-only (tenderly uses no anvil)"
+else
+  CONFIG="config/deployment-config.preprod.jsonc"
+  C_ACCOUNTING="MigrateAccountingPolicies"
+  C_EARNING="MigrateEarningPolicies"
+  C_VA359="Va359ClaimSurplusInterest"
+fi
+
 # --- secrets / RPCs ---------------------------------------------------------------------------------
+# ETH_FORK/ARB_FORK are the upstream RPCs: fork anvil-forks them; tenderly/live talk to them directly.
 set -a; [ -f .env ] && . ./.env; set +a
-ETH_FORK="${RPC_MAINNET:-https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY:?set ALCHEMY_KEY or RPC_MAINNET}}"
-ARB_FORK="${RPC_ARBITRUM:-https://arb-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}}"
+if [ "$MODE" = tenderly ]; then
+  ETH_FORK="${RPC_TENDERLY_MAINNET:?set RPC_TENDERLY_MAINNET for MODE=tenderly}"
+  ARB_FORK="${RPC_TENDERLY_ARBITRUM:?set RPC_TENDERLY_ARBITRUM for MODE=tenderly}"
+else
+  ETH_FORK="${RPC_MAINNET:-https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY:?set ALCHEMY_KEY or RPC_MAINNET}}"
+  ARB_FORK="${RPC_ARBITRUM:-https://arb-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}}"
+fi
 
 # --- config-derived values (no magic literals) -----------------------------------------------------
 cfg() { node -e 'const fs=require("fs");const t=fs.readFileSync(process.argv[1],"utf8").replace(/\/\/.*$/gm,"");const j=JSON.parse(t);const v=process.argv[2].split(".").reduce((o,k)=>o&&o[k],j);process.stdout.write(String(v))' "$CONFIG" "$1"; }
@@ -202,7 +237,9 @@ collect_txs() {
   for f in broadcast/MigrateAccountingPolicies.s.sol/*/*-latest.json \
            broadcast/MigrateEarningPolicies.s.sol/*/*-latest.json \
            broadcast/MigrateAdiCccBindings.s.sol/*/*-latest.json \
-           broadcast/Va359ClaimSurplusInterest.s.sol/*/*-latest.json; do
+           broadcast/Va359ClaimSurplusInterest.s.sol/*/*-latest.json \
+           broadcast/MigratePolicies.s.sol/*/*-latest.json \
+           broadcast/Va359Staging.s.sol/*/*-latest.json; do
     [ -f "$f" ] || continue
     local name; name=$(echo "$f" | sed -E 's#broadcast/(.+)\.s\.sol/([0-9]+)/(.+)-latest\.json#\1__\2__\3#')
     cp "$f" "$DUMP_DIR/${name}.json"; copied=$((copied+1))
@@ -237,6 +274,12 @@ cleanup() {
            cache/MigrateAccountingPolicies.s.sol cache/MigrateEarningPolicies.s.sol \
            cache/MigrateAdiCccBindings.s.sol cache/Va359ClaimSurplusInterest.s.sol 2>/dev/null || true
     rmdir broadcast cache 2>/dev/null || true   # remove if now empty
+  elif [ "$MODE" = tenderly ]; then
+    # tenderly writes vnet receipts under the *Staging script dirs (distinct filenames from the preprod
+    # live records, so it never touches those). They're disposable vnet artifacts → remove like fork.
+    rm -rf broadcast/MigratePolicies.s.sol broadcast/Va359Staging.s.sol \
+           cache/MigratePolicies.s.sol cache/Va359Staging.s.sol 2>/dev/null || true
+    rmdir broadcast cache 2>/dev/null || true   # remove if now empty
   fi
   rm -f "$PWFILE_DEPLOYER" "$PWFILE_MAINADMIN" 2>/dev/null || true
   [ "$KEEP_ANVIL" = 1 ] && { log "leaving anvil forks running (--keep-anvil)"; return; }
@@ -257,10 +300,16 @@ start_anvil() { # <port> <fork-url> <chain-id> <label>
   ok "$label fork @ block $(cast block-number --rpc-url "$rpc")  (deployer+mainAdmin funded)"
 }
 
-check_chain() { # <rpc> <chain-id> <label>   (live)
+check_chain() { # <rpc> <chain-id> <label>   (live / tenderly)
   local got; got="$(cast chain-id --rpc-url "$1" 2>/dev/null || true)"
-  [ "$got" = "$2" ] || fail "$3 live RPC chain-id is '$got', expected $2 ($1)"
-  ok "$3 live RPC ok (chain $2) @ block $(cast block-number --rpc-url "$1")"
+  [ "$got" = "$2" ] || fail "$3 RPC chain-id is '$got', expected $2 ($1)"
+  ok "$3 RPC ok (chain $2) @ block $(cast block-number --rpc-url "$1")"
+}
+
+fund_tenderly() { # <rpc> <label>   (tenderly only — vnet faucet)
+  cast rpc tenderly_setBalance "$DEPLOYER"  "$FUND_HEX" --rpc-url "$1" >/dev/null || fail "$2 tenderly_setBalance failed (deployer)"
+  cast rpc tenderly_setBalance "$MAINADMIN" "$FUND_HEX" --rpc-url "$1" >/dev/null || fail "$2 tenderly_setBalance failed (mainAdmin)"
+  ok "$2 vnet funded (deployer+mainAdmin)"
 }
 
 warp() { # <rpc> <seconds>   (fork only)
@@ -324,7 +373,8 @@ wstep() { # <name> <contract> <fn> <rpc> <role> [verify] [logfile]
   local sender; sender="$(role_addr "$role")"
   local vfy=0
   local args=("$contract" --sig "${fn}()" --rpc-url "$rpc" --sender "$sender")
-  if [ "$MODE" = fork ]; then
+  if [ "$MODE" != live ]; then
+    # fork + tenderly: impersonate the sender (anvil --auto-impersonate / Tenderly vnet unlocked accounts)
     args+=(--unlocked)
     [ "$PHASE" = broadcast ] && args+=(--broadcast)
   else
@@ -354,12 +404,13 @@ rstep() { # <name> <contract> <fn> <rpc> <needle>
 # boundary — the timelock wait. fork: warp; live: stop and emit the resume command.
 boundary() { # <name> <rpc> <seconds> <delay-label> <next-step>
   should_run "$1" || return 0
-  if [ "$MODE" = fork ]; then
+  if [ "$MODE" != live ]; then
+    # fork + tenderly: fast-forward the timelock on the (v)net instead of waiting real wall-clock
     log "warp +$3s ($4)"; warp "$2" "$3"
   else
     local cl="${5%%:*}" pre="MODE=live PHASE=$PHASE"
     [ "$PHASE" = broadcast ] && pre="$pre CONFIRM_LIVE_BROADCAST=YES"
-    HALT_RESUME="$pre script/migrate/preprod/run-migration.sh --chains $(chain_flag "$cl") --start-from $5"
+    HALT_RESUME="$pre script/migrate/run-migration.sh --chains $(chain_flag "$cl") --start-from $5"
     [ "$RUN_VA359" = 0 ] && HALT_RESUME="$HALT_RESUME --no-va359"
     [ "$RUN_ADI" = 1 ] && HALT_RESUME="$HALT_RESUME --adi"
     log "TIMELOCK ($4): wait $3s (~$(($3/3600))h $((($3%3600)/60))m) of REAL time on live, then resume:"
@@ -385,7 +436,7 @@ migrate_chain() { # <contract> <rpc> <label>
 # VA-359: align preprod claimSurplusInterest to prod. Runs on BOTH chains. Same schedule→+2h→execute→
 # +1h→verify cadence (the +1h is the execution-delay 1h→0 reduction setback before verify reads clean).
 migrate_va359() { # <rpc> <label>
-  local c="Va359ClaimSurplusInterest" rpc="$1" L="$2"
+  local c="$C_VA359" rpc="$1" L="$2"
   log "[$L] VA-359 claimSurplusInterest re-config"
   wstep    "$L:va359:schedule" "$c" stepSchedule "$rpc" mainAdmin
   boundary "$L:va359:wait-critical" "$rpc" "$CRITICAL_DELAY" criticalDelay "$L:va359:execute"
@@ -412,7 +463,9 @@ migrate_adi() { # <contract> <rpc> <label>
 forge build script/migrate/preprod/MigrateAccountingPolicies.s.sol \
              script/migrate/preprod/MigrateEarningPolicies.s.sol \
              script/migrate/preprod/MigrateAdiCccBindings.s.sol \
-             script/migrate/preprod/Va359ClaimSurplusInterest.s.sol >/dev/null || fail "compile failed"
+             script/migrate/preprod/Va359ClaimSurplusInterest.s.sol \
+             script/migrate/staging/MigratePolicies.s.sol \
+             script/migrate/staging/Va359Staging.s.sol >/dev/null || fail "compile failed"
 
 if [ "$MODE" = fork ]; then
   # Guard against clobbering real records: fork runs broadcast to broadcast/<script>/<chainId> under the
@@ -427,6 +480,11 @@ if [ "$MODE" = fork ]; then
   case ",$CHAINS," in *,accounting,*) start_anvil 8546 "$ARB_FORK" 42161 arbitrum ;; esac
   case ",$CHAINS," in *,earning,*)    start_anvil 8545 "$ETH_FORK" 1     ethereum ;; esac
   ARB_RPC="http://127.0.0.1:8546"; ETH_RPC="http://127.0.0.1:8545"
+elif [ "$MODE" = tenderly ]; then
+  # Talk to the Tenderly vnets directly (no anvil); validate chain-id, then top up the impersonated signers.
+  ARB_RPC="$ARB_FORK"; ETH_RPC="$ETH_FORK"
+  case ",$CHAINS," in *,accounting,*) check_chain "$ARB_RPC" 42161 arbitrum; fund_tenderly "$ARB_RPC" arbitrum ;; esac
+  case ",$CHAINS," in *,earning,*)    check_chain "$ETH_RPC" 1     ethereum; fund_tenderly "$ETH_RPC" ethereum ;; esac
 else
   ARB_RPC="$ARB_FORK"; ETH_RPC="$ETH_FORK"
   case ",$CHAINS," in *,accounting,*) check_chain "$ARB_RPC" 42161 arbitrum ;; esac
@@ -434,9 +492,9 @@ else
 fi
 
 if [ "$RUN_POLICY" = 1 ]; then
-  case ",$CHAINS," in *,accounting,*) migrate_chain MigrateAccountingPolicies "$ARB_RPC" arbitrum ;; esac
+  case ",$CHAINS," in *,accounting,*) migrate_chain "$C_ACCOUNTING" "$ARB_RPC" arbitrum ;; esac
   if [ "$RUN_VA359" = 1 ]; then case ",$CHAINS," in *,accounting,*) migrate_va359 "$ARB_RPC" arbitrum ;; esac; fi
-  case ",$CHAINS," in *,earning,*)    migrate_chain MigrateEarningPolicies    "$ETH_RPC" ethereum ;; esac
+  case ",$CHAINS," in *,earning,*)    migrate_chain "$C_EARNING"    "$ETH_RPC" ethereum ;; esac
   if [ "$RUN_VA359" = 1 ]; then case ",$CHAINS," in *,earning,*) migrate_va359 "$ETH_RPC" ethereum ;; esac; fi
 fi
 if [ "$RUN_ADI" = 1 ]; then
@@ -505,5 +563,9 @@ fi
 if [ -n "$HALT_RESUME" ]; then
   log "halted at a live timelock boundary — wait the delay above, then run the printed resume command."
 else
-  ok "$([ "$MODE" = live ] && echo "live migration step(s) complete ($PHASE)" || echo "fork rehearsal complete")"
+  case "$MODE" in
+    live)     ok "live migration step(s) complete ($PHASE)" ;;
+    tenderly) ok "tenderly staging migration complete ($PHASE)" ;;
+    *)        ok "fork rehearsal complete" ;;
+  esac
 fi
