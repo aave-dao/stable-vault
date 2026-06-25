@@ -224,6 +224,7 @@ abstract contract PolicyMigrationBase is BaseChainDeployment {
     function stepScheduleWiring() external {
         vm.startBroadcast(_mainAdmin());
         _wiringOps(true);
+        _setPolicyOps(true); // cutover scheduled with the wiring (CRITICAL); executed in step 3 or 4 per _cutoverLast()
         vm.stopBroadcast();
     }
 
@@ -239,6 +240,11 @@ abstract contract PolicyMigrationBase is BaseChainDeployment {
         WithdrawalExecutionPolicy(_newWithdrawalExecutionPolicy())
             .setDefaultFeeBps(_configUint16(".withdrawalExecutionPolicy.defaultFeeBps"));
 
+        // Cutover now (preprod ordering). Non-blocking (_cutoverLast) defers it to step 4, after capacity+signer.
+        if (!_cutoverLast()) {
+            _setPolicyOps(false);
+        }
+
         _bucketOps(true);
         vm.stopBroadcast();
     }
@@ -250,6 +256,11 @@ abstract contract PolicyMigrationBase is BaseChainDeployment {
     function stepExecuteBuckets() external {
         vm.startBroadcast(_mainAdmin());
         _bucketOps(false);
+
+        // Non-blocking ordering: the registry cutover runs LAST — the new policy now has capacity + signer.
+        if (_cutoverLast()) {
+            _setPolicyOps(false);
+        }
         vm.stopBroadcast();
     }
 
@@ -305,7 +316,6 @@ abstract contract PolicyMigrationBase is BaseChainDeployment {
         address amAddr = address(am);
         address fbp = _newFundsBridgingPolicy();
         address wep = _newWithdrawalExecutionPolicy();
-        address registry = getPolicyRegistryAddress(_deployer());
 
         // 1) Re-bind every selector of each new policy address to its roleId (target bindings are
         //    address-specific, so all selectors must be rebound to the new contract).
@@ -343,19 +353,7 @@ abstract contract PolicyMigrationBase is BaseChainDeployment {
             _op(am, amAddr, abi.encodeCall(IAccessManager.setGrantDelay, (r.roleId, r.delay)), doSchedule);
         }
 
-        // 3) Re-point the PolicyRegistry to the new addresses (CRITICAL_DELAY).
-        if (_hasDepositPolicy()) {
-            _op(
-                am,
-                registry,
-                abi.encodeCall(IPolicyRegistry.setPolicy, (_depositPolicyId(), _newDepositPolicy())),
-                doSchedule
-            );
-        }
-        _op(am, registry, abi.encodeCall(IPolicyRegistry.setPolicy, (_bridgePolicyId(), fbp)), doSchedule);
-        _op(am, registry, abi.encodeCall(IPolicyRegistry.setPolicy, (_withdrawalExecutionPolicyId(), wep)), doSchedule);
-
-        // 4) Accounting only: upgrade the StableVault proxy to the new implementation. The ProxyAdmin is
+        // 3) Accounting only: upgrade the StableVault proxy to the new implementation. The ProxyAdmin is
         //    owned by the AccessManager, so this routes as AccessManager → ProxyAdmin.upgradeAndCall and is
         //    ADMIN_ROLE-gated at CRITICAL (2h) — same window as the wiring above. No re-init (storage-safe).
         if (_isAccountingChain()) {
@@ -368,6 +366,44 @@ abstract contract PolicyMigrationBase is BaseChainDeployment {
                 doSchedule
             );
         }
+    }
+
+    /// @dev The PolicyRegistry cutover (re-point each policy id to its new address). Split out of _wiringOps
+    ///      so its EXECUTION can be deferred to last — after the new policy has capacity + signer — for a
+    ///      zero-downtime migration (see _cutoverLast()). Always scheduled with the wiring (CRITICAL), so it
+    ///      matures in the same window regardless of when it executes.
+    function _setPolicyOps(bool doSchedule) internal {
+        IAccessManager am = _am();
+        address registry = getPolicyRegistryAddress(_deployer());
+        if (_hasDepositPolicy()) {
+            _op(
+                am,
+                registry,
+                abi.encodeCall(IPolicyRegistry.setPolicy, (_depositPolicyId(), _newDepositPolicy())),
+                doSchedule
+            );
+        }
+        _op(
+            am,
+            registry,
+            abi.encodeCall(IPolicyRegistry.setPolicy, (_bridgePolicyId(), _newFundsBridgingPolicy())),
+            doSchedule
+        );
+        _op(
+            am,
+            registry,
+            abi.encodeCall(
+                IPolicyRegistry.setPolicy, (_withdrawalExecutionPolicyId(), _newWithdrawalExecutionPolicy())
+            ),
+            doSchedule
+        );
+    }
+
+    /// @dev When true (staging/prod non-blocking), the PolicyRegistry cutover EXECUTES last — after the new
+    ///      policy has capacity + signer — so it is never registry-active at zero capacity (no deposit/
+    ///      withdrawal/bridging downtime). Default false = preprod's ordering (cutover with the wiring step).
+    function _cutoverLast() internal pure virtual returns (bool) {
+        return false;
     }
 
     function _bindSelectors(
@@ -530,14 +566,21 @@ abstract contract PolicyMigrationBase is BaseChainDeployment {
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
     function _op(IAccessManager am, address target, bytes memory data, bool doSchedule) internal {
+        bytes32 id = am.hashOperation(_mainAdmin(), target, data);
         if (doSchedule) {
             // when=0 → earliest allowed (now + setback). Idempotent: skip if already scheduled & pending.
-            bytes32 id = am.hashOperation(_mainAdmin(), target, data);
             if (am.getSchedule(id) != 0) {
                 return;
             }
             am.schedule(target, data, 0);
         } else {
+            // Resumable: skip ops no longer pending (getSchedule==0 → already executed, e.g. by an
+            // interrupted prior run). Mirrors the schedule-side idempotency so re-running an execute step
+            // after a partial/aborted broadcast completes only the remaining gaps instead of reverting
+            // (AccessManagerNotScheduled) on an already-consumed op. verify() is the end-state safety net.
+            if (am.getSchedule(id) == 0) {
+                return;
+            }
             am.execute(target, data);
         }
     }

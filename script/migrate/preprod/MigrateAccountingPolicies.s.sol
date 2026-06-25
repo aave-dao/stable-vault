@@ -19,7 +19,7 @@ import {PolicyMigrationBase} from "script/migrate/preprod/PolicyMigrationBase.so
 /// the chain hooks below mirror AccountingChainDeployment. Policy ids use the same documented keccak
 /// preimages as the source constants (verified equal to AccountingChainDeployment's literals).
 contract MigrateAccountingPolicies is PolicyMigrationBase {
-    function _configPath() internal pure override returns (string memory) {
+    function _configPath() internal pure virtual override returns (string memory) {
         return "config/deployment-config.preprod.jsonc";
     }
 

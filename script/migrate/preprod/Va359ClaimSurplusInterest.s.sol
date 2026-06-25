@@ -34,7 +34,7 @@ import {RolesConfig} from "script/base/RolesConfig.sol";
 ///   forge script Va359ClaimSurplusInterest --sig "stepSchedule()" --sender <MAIN_ADMIN>
 ///   (wait 2h) --sig "stepExecute()" --sender <MAIN_ADMIN>   (wait 1h) --sig "verify()"
 contract Va359ClaimSurplusInterest is AccountingChainDeployment {
-    function _configPath() internal pure override returns (string memory) {
+    function _configPath() internal pure virtual override returns (string memory) {
         return "config/deployment-config.preprod.jsonc";
     }
 

@@ -19,7 +19,7 @@ import {PolicyMigrationBase} from "script/migrate/preprod/PolicyMigrationBase.so
 ///
 /// Inherits only PolicyMigrationBase; the chain hooks below mirror EarningChainDeployment.
 contract MigrateEarningPolicies is PolicyMigrationBase {
-    function _configPath() internal pure override returns (string memory) {
+    function _configPath() internal pure virtual override returns (string memory) {
         return "config/deployment-config.preprod.jsonc";
     }
 
