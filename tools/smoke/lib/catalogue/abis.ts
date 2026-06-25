@@ -78,6 +78,8 @@ export const SLIPPAGE_COVERAGE_VAULT_ABI = [
     outputs: [{ name: "", type: "uint256" }],
   },
   {
+    // Must match SlippageCoverageVault.Window field order/types exactly, or the picked field
+    // reads the wrong word (a reversed layout made `.cap` read `windowStart` == 0).
     type: "function",
     name: "getWindow",
     stateMutability: "view",
@@ -87,10 +89,10 @@ export const SLIPPAGE_COVERAGE_VAULT_ABI = [
         name: "",
         type: "tuple",
         components: [
-          { name: "cap", type: "uint256" },
-          { name: "windowSeconds", type: "uint32" },
-          { name: "consumed", type: "uint256" },
           { name: "windowStart", type: "uint64" },
+          { name: "windowSeconds", type: "uint64" },
+          { name: "consumed", type: "uint128" },
+          { name: "cap", type: "uint128" },
         ],
       },
     ],

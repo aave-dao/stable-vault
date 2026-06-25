@@ -18,21 +18,6 @@ import type { CheckResult, DeploymentArtefact } from "../types.js";
 // keccak256("eip1967.proxy.implementation") - 1
 const ERC1967_IMPL_SLOT: Hex = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
 
-// Names that we know are transparent proxies — their "<Name>::Implementation"
-// entry holds the impl address and the proxy address must reference it via the
-// ERC-1967 storage slot.
-const TRANSPARENT_PROXIES: ReadonlySet<string> = new Set([
-  "AssetRegistry",
-  "WithdrawalPolicy", // emitted under this name in some artefacts; alias kept for safety
-  "WithdrawalExecutionPolicy",
-  "DepositPolicy",
-  "FundsBridgingPolicy",
-  "Allocator",
-  "IouTokenManager",
-  "PriceOracle",
-  "PolicyRegistry",
-]);
-
 // Names that are intentionally absent from the artefact in some envs (e.g. a.DI
 // adapter when registerOnGateway=false). Smoke skips them with a warning, not
 // a failure.
@@ -145,15 +130,18 @@ export async function runTopology(args: TopologyArgs): Promise<CheckResult[]> {
       });
     }
 
-    // 4. ERC-1967 impl slot for transparent proxies
-    if (TRANSPARENT_PROXIES.has(name)) {
+    // 4. ERC-1967 impl slot — only for contracts the deployment recorded an implementation for.
+    // Driven by the artefact's "<Name>::Implementation" entry (ground truth) rather than a
+    // hardcoded proxy set, so it self-maintains as topology changes (e.g. policies deployed
+    // directly rather than behind a proxy won't false-fail with a zero impl slot).
+    const recordedImpl = implEntry(artefact, name);
+    if (recordedImpl) {
       const slotRaw = await client.getStorageAt({
         address: entry.address,
         slot: ERC1967_IMPL_SLOT,
         blockNumber,
       });
       const onChainImpl = slotRaw ? (`0x${slotRaw.slice(-40)}` as Address) : null;
-      const recordedImpl = implEntry(artefact, name);
       if (!onChainImpl || onChainImpl === "0x0000000000000000000000000000000000000000") {
         results.push({
           group: "topology",

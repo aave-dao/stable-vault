@@ -198,18 +198,32 @@ function buildStableVaultSpecs(args: BuildArgs): GetterSpec[] {
   const ac = (config.accountingChain ?? {}) as ChainConfig;
   const specs: GetterSpec[] = [];
 
-  // Treasury address may be initially zero (set later). Check exact match with config when set.
-  // Note: JSONC has no `treasury` field today — it's set post-deploy. Track via skipIf.
-  specs.push({
-    group: "StableVault",
-    key: "StableVault.treasury",
-    address: stableVault.address,
-    abi: STABLE_VAULT_ABI,
-    functionName: "getTreasury",
-    expected: "0x0000000000000000000000000000000000000000",
-    format: "address",
-    skipIf: { reason: "treasury is set post-deploy; check after first claimSurplusInterest config" },
-  });
+  // Treasury is set post-deploy and the JSONC may not carry it. Only assert parity when config
+  // declares a `treasury`; otherwise skip (a hard-coded 0x0 expectation goes stale the moment
+  // treasury is set, silently passing). See VA-229 audit.
+  const treasury = ac.treasury as string | undefined;
+  if (treasury !== undefined && treasury !== "TBD") {
+    specs.push({
+      group: "StableVault",
+      key: "StableVault.treasury",
+      address: stableVault.address,
+      abi: STABLE_VAULT_ABI,
+      functionName: "getTreasury",
+      expected: getAddress(treasury),
+      format: "address",
+    });
+  } else {
+    specs.push({
+      group: "StableVault",
+      key: "StableVault.treasury",
+      address: stableVault.address,
+      abi: STABLE_VAULT_ABI,
+      functionName: "getTreasury",
+      expected: "0x0000000000000000000000000000000000000000",
+      format: "address",
+      skipIf: { reason: "no `accountingChain.treasury` in config; treasury is set post-deploy" },
+    });
+  }
 
   if (ac.defaultMaxPerSecondRate !== undefined) {
     specs.push({
@@ -223,6 +237,10 @@ function buildStableVaultSpecs(args: BuildArgs): GetterSpec[] {
     });
   }
   if (ac.defaultSubVaultPerSecondRate !== undefined) {
+    // Real parity check: StableVault.initialize() sets the default sub-vault to
+    // `defaultSubVaultPerSecondRate` (via _setDefaultSubVault(_getOrCreateSubVaultWithRate(rate), rate)),
+    // so getDefaultSubVault().perSecondRate must equal the config rate. (The dashboard demotes this
+    // to INFO calling it a "different concept" — that's wrong; it correctly catches default-rate drift.)
     specs.push({
       group: "StableVault",
       key: "StableVault.defaultSubVault.perSecondRate",
@@ -633,18 +651,11 @@ function buildBridgeAdapterSpecs(args: BuildArgs): GetterSpec[] {
   if (remoteChainId === undefined) return [];
 
   const specs: GetterSpec[] = [];
+  // Only CcipAdapter moves funds; it is the sole funds bridge adapter. AdiAdapter is a *data-only*
+  // adapter (verified below via getDataOnlyBridgeAdapterMode) and is intentionally NOT registered
+  // as a funds bridge adapter — so it must not be asserted into the funds whitelist here.
   const adapters: Array<{ name: string; addr: Address; conditional: boolean; reason?: string }> = [];
   if (ccipAdapter) adapters.push({ name: "CcipAdapter", addr: ccipAdapter.address, conditional: false });
-  if (adiAdapter && adiConfig.registerOnGateway) {
-    adapters.push({ name: "AdiAdapter", addr: adiAdapter.address, conditional: false });
-  } else if (adiAdapter) {
-    adapters.push({
-      name: "AdiAdapter",
-      addr: adiAdapter.address,
-      conditional: true,
-      reason: "AdiAdapter present but adi.registerOnGateway=false; skip whitelist check",
-    });
-  }
 
   for (const adapter of adapters) {
     for (const asset of ASSETS) {
