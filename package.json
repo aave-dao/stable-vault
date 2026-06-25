@@ -8,8 +8,7 @@
     "picocolors": "1.1.1",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3",
-    "viem": "2.49.3",
-    "vitest": "3.2.4"
+    "viem": "2.49.3"
   },
   "lint-staged": {
     "**/*.sol": "forge fmt"
@@ -44,7 +43,7 @@
     "smoke:staging:earning": "tsx --env-file-if-exists=.env tools/smoke/run.ts --env staging --chain earning",
     "smoke:prod:accounting": "tsx --env-file-if-exists=.env tools/smoke/run.ts --env prod --chain accounting",
     "smoke:prod:earning": "tsx --env-file-if-exists=.env tools/smoke/run.ts --env prod --chain earning",
-    "smoke:test": "vitest run tools/smoke/__tests__",
+    "smoke:test": "tsx --test tools/smoke/__tests__/*.test.ts",
     "smoke:typecheck": "tsc --noEmit -p tools/smoke/tsconfig.json",
     "smoke:audit-deps": "tsx tools/smoke/scripts/check-deps-age.ts"
   }

@@ -1,7 +1,8 @@
 // Parity engine tests use mock multicall results to avoid hitting an RPC.
 // We verify the engine maps multicall return shapes to CheckResult correctly.
 
-import { describe, expect, it } from "vitest";
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
 
 import { runParity, type GetterSpec } from "../lib/parity.js";
 import { DEPOSIT_POLICY_ABI } from "../lib/catalogue/abis.js";
@@ -29,9 +30,9 @@ describe("runParity", () => {
     };
     const client = mockClient([{ status: "success", result: { capacity: 500n, refillRate: 0n } }]);
     const results = await runParity({ client, blockNumber: 1n, specs: [spec] });
-    expect(results).toHaveLength(1);
-    expect(results[0]!.severity).toBe("pass");
-    expect(results[0]!.actual).toBe(500n);
+    assert.equal(results.length, 1);
+    assert.equal(results[0]!.severity, "pass");
+    assert.equal(results[0]!.actual, 500n);
   });
 
   it("emits fail when on-chain diverges from expected", async () => {
@@ -48,8 +49,8 @@ describe("runParity", () => {
     };
     const client = mockClient([{ status: "success", result: { capacity: 1_000_000n, refillRate: 0n } }]);
     const results = await runParity({ client, blockNumber: 1n, specs: [spec] });
-    expect(results[0]!.severity).toBe("fail");
-    expect(results[0]!.actual).toBe(1_000_000n);
+    assert.equal(results[0]!.severity, "fail");
+    assert.equal(results[0]!.actual, 1_000_000n);
   });
 
   it("emits error on multicall failure", async () => {
@@ -66,8 +67,8 @@ describe("runParity", () => {
     };
     const client = mockClient([{ status: "failure", error: new Error("execution reverted") }]);
     const results = await runParity({ client, blockNumber: 1n, specs: [spec] });
-    expect(results[0]!.severity).toBe("error");
-    expect(results[0]!.note).toContain("execution reverted");
+    assert.equal(results[0]!.severity, "error");
+    assert.ok(results[0]!.note!.includes("execution reverted"));
   });
 
   it("respects skipIf and never calls the RPC for those entries", async () => {
@@ -85,7 +86,7 @@ describe("runParity", () => {
     let called = false;
     const client: any = { multicall: async () => ((called = true), []) };
     const results = await runParity({ client, blockNumber: 1n, specs: [spec] });
-    expect(called).toBe(false);
-    expect(results[0]!.severity).toBe("skipped");
+    assert.equal(called, false);
+    assert.equal(results[0]!.severity, "skipped");
   });
 });

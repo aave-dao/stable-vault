@@ -17,7 +17,7 @@ const MIN_AGE_MS = MIN_AGE_DAYS * 24 * 60 * 60 * 1000;
 // Direct deps the smoke harness introduced. Add a new entry when smoke gains a
 // new direct dep; transitive deps are intentionally excluded (auditing them is
 // the job of dependabot + the lockfile, not this gate).
-const SMOKE_DIRECT_DEPS = ["viem", "vitest", "picocolors", "cli-table3"] as const;
+const SMOKE_DIRECT_DEPS = ["viem", "picocolors", "cli-table3"] as const;
 
 interface NpmTimeResponse {
   time: Record<string, string>;
