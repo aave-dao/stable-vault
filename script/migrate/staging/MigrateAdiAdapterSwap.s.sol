@@ -41,6 +41,11 @@ interface IGatewayRemovalId {
 ///   --- wait HIGH (1h) ---
 ///   stepExecuteFinalize()  [MAIN ADMIN] execute finalize (old removed)
 ///   verify()                            new = approved sender + guardian; old no longer a sender
+///
+/// NOTE: this swap re-wires the new adapter's CCC/gateway references but does NOT set its AccessManager
+/// function->role bindings (setTargetFunctionRole is keyed by contract address, so the old adapter's bindings
+/// do not carry over). Run MigrateAdiAdapterBindings AFTER this swap to replicate genesis _setupTarget__AdiAdapter
+/// (setDestinationChainAdapter / rescueTokens / rescueNative) for the new adapter.
 abstract contract AdiAdapterSwapBase is BaseChainDeployment {
     /// @dev New Create3 salt for the post-#349 adapter (the genesis salt's address is occupied by the old one).
     string internal constant NEW_ADI_ADAPTER_SALT = "aave.stable-vault.AdiAdapter.pr349";
