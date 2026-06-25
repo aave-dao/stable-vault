@@ -121,7 +121,12 @@ jobs:
           SMOKE_RPC_PROD_ARBITRUM: https://arb-mainnet.g.alchemy.com/v2/${{ env.ALCHEMY_KEY }}
         run: |
           set -o pipefail
-          yarn smoke:prod --summary 2>&1 | tee smoke-summary.txt
+          # Invoke tsx directly (not via `yarn smoke:prod`) so the comment isn't polluted by the
+          # yarn wrapper banner or tsx's "--env-file-if-exists .env not found" notice — CI uses the
+          # real SMOKE_RPC_* env vars below, not a .env file. node_modules/.bin must be on PATH so
+          # run-env's child `spawn("tsx", …)` resolves (yarn would otherwise add it).
+          export PATH="$PWD/node_modules/.bin:$PATH"
+          tsx tools/smoke/run-env.ts --env prod --summary 2>&1 | tee smoke-summary.txt
 
       - name: Build PR comment
         if: github.event_name == 'pull_request'
