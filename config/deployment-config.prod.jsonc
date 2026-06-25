@@ -123,7 +123,7 @@
       "registerOnGateway": true
     },
     "defaultMaxPerSecondRate": "1000000005781378656804591713",
-    "defaultSubVaultPerSecondRate": "1000000001243680656318820313",
+    "defaultSubVaultPerSecondRate": "1000000000000000000000000000", // 0% APY
     "defaultMaxActiveSubVaults": 201,
     "stableVaultName": "Aave USD Stable Vault",
     "stableVaultSymbol": "ASV-USD",
