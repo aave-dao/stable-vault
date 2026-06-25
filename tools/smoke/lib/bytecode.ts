@@ -18,9 +18,9 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 export type BytecodeMatch =
-  | { kind: "exact" }
-  | { kind: "immutables"; count: number }
-  | { kind: "metadata" } // logic-identical; only the trailing CBOR metadata differs
+  | { kind: "exact"; profile: string }
+  | { kind: "immutables"; count: number; profile: string }
+  | { kind: "metadata"; profile: string } // logic-identical; only the trailing CBOR metadata differs
   | { kind: "mismatch"; note: string }
   | { kind: "no-artifact" };
 
@@ -32,46 +32,59 @@ interface ArtefactJson {
   deployedBytecode?: { object?: string; immutableReferences?: Record<string, ImmutableRef[]> };
 }
 
-interface LoadedArtefact {
+interface Candidate {
+  /** compiler profile this artefact was built in: "default" (1M runs), "balanced" (9k), … */
+  profile: string;
   object: string;
   refs: Record<string, ImmutableRef[]>;
 }
 
-const cache = new Map<string, LoadedArtefact | null>();
+const cache = new Map<string, Candidate[]>();
 
 /**
- * Compare `<name>`'s on-chain runtime bytecode against the current build. Returns the strongest
- * tier: exact > immutables (equal after masking immutable sites) > metadata (equal after also
- * stripping the CBOR trailer) > mismatch. `no-artifact` when the build output is unavailable.
+ * Compare `<name>`'s on-chain runtime bytecode against the current build, trying EVERY compiler-
+ * profile variant Foundry emitted (<name>.json, <name>.balanced.json, …) as a candidate. A
+ * contract deployed under any profile matches its variant, so we don't need to know or pin the
+ * deploy's optimizer_runs. Returns the strongest tier across candidates:
+ * exact > immutables (equal after masking immutable sites) > metadata (equal after also stripping
+ * the CBOR trailer) > mismatch. `no-artifact` when the build output is unavailable.
  */
 export function matchDeployedBytecode(name: string, onchain: string, repoRoot: string): BytecodeMatch {
   const baseName = name.split("::")[0]!;
-  const art = loadArtefact(baseName, repoRoot);
-  if (!art) return { kind: "no-artifact" };
+  const candidates = loadCandidates(baseName, repoRoot);
+  if (candidates.length === 0) return { kind: "no-artifact" };
 
   const on = strip0x(onchain).toLowerCase();
-  const ax = strip0x(art.object).toLowerCase();
-  if (on === ax) return { kind: "exact" };
+  let immutables: BytecodeMatch | null = null;
+  let metadata: BytecodeMatch | null = null;
+  const notes: string[] = [];
 
-  if (on.length === ax.length) {
-    // The artefact already has zeros at immutable sites; mask both for safety.
-    const onMasked = maskRanges(on, art.refs);
-    const axMasked = maskRanges(ax, art.refs);
-    if (onMasked === axMasked) {
-      return { kind: "immutables", count: Object.keys(art.refs).length };
+  for (const c of candidates) {
+    const ax = strip0x(c.object).toLowerCase();
+    if (on === ax) return { kind: "exact", profile: c.profile }; // strongest possible
+    if (on.length === ax.length) {
+      // The artefact already has zeros at immutable sites; mask both for safety.
+      const onMasked = maskRanges(on, c.refs);
+      const axMasked = maskRanges(ax, c.refs);
+      if (onMasked === axMasked) {
+        immutables ??= { kind: "immutables", count: Object.keys(c.refs).length, profile: c.profile };
+        continue;
+      }
+      const onStripped = stripCborMetadata(onMasked);
+      const axStripped = stripCborMetadata(axMasked);
+      if (onStripped !== null && onStripped === axStripped) {
+        metadata ??= { kind: "metadata", profile: c.profile };
+        continue;
+      }
     }
-    const onStripped = stripCborMetadata(onMasked);
-    const axStripped = stripCborMetadata(axMasked);
-    if (onStripped !== null && onStripped === axStripped) {
-      return { kind: "metadata" };
-    }
+    notes.push(
+      on.length !== ax.length
+        ? `${c.profile}: length ${on.length / 2}B on-chain vs ${ax.length / 2}B`
+        : `${c.profile}: differs at byte ${firstDiff(on, ax)}`,
+    );
   }
 
-  const note =
-    on.length !== ax.length
-      ? `length ${on.length / 2}B on-chain vs ${ax.length / 2}B artefact`
-      : `differs at byte ${firstDiff(on, ax)}`;
-  return { kind: "mismatch", note };
+  return immutables ?? metadata ?? { kind: "mismatch", note: notes.join("; ") };
 }
 
 // ---------- pure helpers (exported for unit tests) ----------
@@ -107,44 +120,63 @@ function firstDiff(a: string, b: string): number {
 
 // ---------- artefact loading ----------
 
-function loadArtefact(name: string, repoRoot: string): LoadedArtefact | null {
-  if (cache.has(name)) return cache.get(name)!;
-  const loaded = readArtefact(name, repoRoot) ?? readViaForgeInspect(name, repoRoot);
-  cache.set(name, loaded);
-  return loaded;
+function loadCandidates(name: string, repoRoot: string): Candidate[] {
+  const cached = cache.get(name);
+  if (cached) return cached;
+  let candidates = readArtefactVariants(name, repoRoot);
+  if (candidates.length === 0) candidates = readViaForgeInspect(name, repoRoot);
+  cache.set(name, candidates);
+  return candidates;
 }
 
-function readArtefact(name: string, repoRoot: string): LoadedArtefact | null {
-  const found = findArtefactFile(join(repoRoot, "out"), `${name}.json`);
-  if (!found) return null;
-  try {
-    const parsed = JSON.parse(readFileSync(found, "utf8")) as ArtefactJson;
-    const obj = parsed.deployedBytecode?.object;
-    if (!obj || obj === "0x") return null;
-    return { object: obj, refs: parsed.deployedBytecode?.immutableReferences ?? {} };
-  } catch {
-    return null;
-  }
-}
-
-function findArtefactFile(root: string, filename: string): string | null {
-  try {
-    for (const e of readdirSync(root, { withFileTypes: true })) {
-      const full = join(root, e.name);
-      if (e.isDirectory()) {
-        const inner = findArtefactFile(full, filename);
-        if (inner) return inner;
-      } else if (e.name === filename && statSync(full).isFile()) {
-        return full;
-      }
+/**
+ * Collect every artefact variant Foundry emitted for `<name>`: `<name>.json` (the default profile)
+ * plus per-profile variants `<name>.<profile>.json` (e.g. `<name>.balanced.json`). They live in the
+ * `<name>.sol` directory under out/.
+ */
+function readArtefactVariants(name: string, repoRoot: string): Candidate[] {
+  const out: Candidate[] = [];
+  for (const file of findArtefactFiles(join(repoRoot, "out"), name)) {
+    try {
+      const parsed = JSON.parse(readFileSync(file, "utf8")) as ArtefactJson;
+      const obj = parsed.deployedBytecode?.object;
+      if (!obj || obj === "0x") continue;
+      out.push({ profile: profileFromFile(file, name), object: obj, refs: parsed.deployedBytecode?.immutableReferences ?? {} });
+    } catch {
+      // skip unreadable/!json variant
     }
-  } catch {
-    // out/ missing or unreadable — fall through to forge inspect
   }
-  return null;
+  return out;
 }
 
-function readViaForgeInspect(name: string, repoRoot: string): LoadedArtefact | null {
+/** Filenames are `<name>.json` (default) or `<name>.<profile>.json`. */
+function profileFromFile(file: string, name: string): string {
+  const base = file.slice(file.lastIndexOf("/") + 1); // basename
+  const mid = base.slice(name.length + 1, base.length - ".json".length); // between "<name>." and ".json"
+  return mid === "" ? "default" : mid;
+}
+
+function findArtefactFiles(root: string, name: string): string[] {
+  const matches: string[] = [];
+  const walk = (dir: string) => {
+    try {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, e.name);
+        if (e.isDirectory()) walk(full);
+        // `<name>.json` and `<name>.<profile>.json`, but not `<nameOther>.json`.
+        else if (e.name.startsWith(`${name}.`) && e.name.endsWith(".json") && statSync(full).isFile()) {
+          matches.push(full);
+        }
+      }
+    } catch {
+      // out/ missing or unreadable — fall through to forge inspect
+    }
+  };
+  walk(root);
+  return matches;
+}
+
+function readViaForgeInspect(name: string, repoRoot: string): Candidate[] {
   try {
     const stdout = execFileSync("forge", ["inspect", name, "deployedBytecode", "--json"], {
       cwd: repoRoot,
@@ -153,10 +185,10 @@ function readViaForgeInspect(name: string, repoRoot: string): LoadedArtefact | n
     });
     const parsed = JSON.parse(stdout) as { object?: string } | string;
     const obj = typeof parsed === "string" ? parsed : parsed.object;
-    if (!obj || obj === "0x") return null;
+    if (!obj || obj === "0x") return [];
     // forge inspect doesn't surface immutableReferences — masking unavailable on this path.
-    return { object: obj, refs: {} };
+    return [{ profile: "inspect", object: obj, refs: {} }];
   } catch {
-    return null;
+    return [];
   }
 }

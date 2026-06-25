@@ -126,10 +126,10 @@ export async function runTopology(args: TopologyArgs): Promise<CheckResult[]> {
       } else {
         const note =
           match.kind === "exact"
-            ? "exact match"
+            ? `exact match (${match.profile})`
             : match.kind === "immutables"
-              ? `logic match (${match.count} immutable${match.count === 1 ? "" : "s"} set on-chain)`
-              : "logic match (compiler metadata differs)";
+              ? `logic match (${match.profile}; ${match.count} immutable${match.count === 1 ? "" : "s"} set on-chain)`
+              : `logic match (${match.profile}; compiler metadata differs)`;
         results.push({
           group: "topology",
           key: `${name}.bytecode`,
