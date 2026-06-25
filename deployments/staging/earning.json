@@ -19,13 +19,9 @@
     "address": "0xf78a3de8aec7e3185495ccf1c57448a0289ec04b",
     "saltSeed": "aave.stable-vault.PolicyRegistry"
   },
-  "WithdrawalExecutionPolicy::Implementation": {
-    "address": "0xc976f91c624232d2c0618cf41b48574bb36724f7",
-    "saltSeed": ""
-  },
   "WithdrawalExecutionPolicy": {
-    "address": "0x501ff3b6dab342c94fc8c798efb8438d937ffeb6",
-    "saltSeed": "aave.stable-vault.WithdrawalExecutionPolicy"
+    "address": "0x7017cdb4a20f193ad163ecac92f3585982ce75a0",
+    "saltSeed": "aave.stable-vault.WithdrawalExecutionPolicy.b9461591"
   },
   "IouToken": {
     "address": "0x4852acef76165e89fd38617b83feee7e7969a9be",
@@ -88,8 +84,8 @@
     "saltSeed": "aave.stable-vault.EarningChainStateProvider"
   },
   "FundsBridgingPolicy": {
-    "address": "0x25616017f611a7df2eee9a49fdf9a2ec8cf1fc96",
-    "saltSeed": "aave.stable-vault.FundsBridgingPolicy"
+    "address": "0x2b4b682734f772342a00fd56fe3c2906641d8e00",
+    "saltSeed": "aave.stable-vault.FundsBridgingPolicy.b9461591"
   },
   "aTokenVaults": [
     {
