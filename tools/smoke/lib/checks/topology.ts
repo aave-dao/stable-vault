@@ -5,14 +5,16 @@
 // Four layers per entry:
 //   1. CREATE3 re-derivation (if saltSeed is non-empty) -> address matches artefact
 //   2. code.length > 0 at the recorded address
-//   3. keccak256(actual.code) == keccak256(forge-inspected deployedBytecode)
+//   3. Runtime bytecode logic match vs the current build (immutable- and metadata-tolerant);
+//      skipped for proxy entries (their logic is the impl, checked via the ::Implementation
+//      entry + the ERC-1967 slot below)
 //   4. For transparent proxies: ERC-1967 impl slot matches the "<Name>::Implementation" entry
 
-import { keccak256, type Address, type Hex, type PublicClient } from "viem";
+import { type Address, type Hex, type PublicClient } from "viem";
 
 import { implEntry } from "../artefact.js";
 import { computeCreate3Address } from "../create3.js";
-import { expectedRuntimeBytecodeHash } from "../bytecode.js";
+import { matchDeployedBytecode } from "../bytecode.js";
 import type { CheckResult, DeploymentArtefact } from "../types.js";
 
 // keccak256("eip1967.proxy.implementation") - 1
@@ -97,44 +99,51 @@ export async function runTopology(args: TopologyArgs): Promise<CheckResult[]> {
       actual: `${codeSize.toLocaleString()} bytes`,
     });
 
-    // 3. Bytecode-hash equivalence
-    try {
-      const expectedHash = expectedRuntimeBytecodeHash(name, repoRoot);
-      const actualHash = keccak256(code);
-      if (expectedHash !== actualHash) {
+    // A "<Name>::Implementation" sibling means this entry is a proxy. Its runtime is OZ proxy
+    // boilerplate, not the contract logic — so we don't byte-match the proxy itself; the logic is
+    // verified on the ::Implementation entry (matched below) plus the ERC-1967 slot check.
+    const recordedImpl = implEntry(artefact, name);
+
+    // 3. Runtime bytecode logic match vs the current build (skips proxies).
+    if (!recordedImpl) {
+      const match = matchDeployedBytecode(name, code, repoRoot);
+      if (match.kind === "no-artifact") {
         results.push({
           group: "topology",
-          key: `${name}.bytecode-hash`,
+          key: `${name}.bytecode`,
+          severity: "warning",
+          note: "could not resolve build artefact (run `forge build`)",
+        });
+      } else if (match.kind === "mismatch") {
+        results.push({
+          group: "topology",
+          key: `${name}.bytecode`,
           severity: "fail",
-          expected: expectedHash,
-          actual: actualHash,
-          format: "bytes32",
-          note: "runtime bytecode does not match the compiled artefact",
+          expected: "matches built artefact",
+          actual: "differs",
+          note: `runtime bytecode does not match the build — ${match.note}`,
         });
       } else {
+        const note =
+          match.kind === "exact"
+            ? "exact match"
+            : match.kind === "immutables"
+              ? `logic match (${match.count} immutable${match.count === 1 ? "" : "s"} set on-chain)`
+              : "logic match (compiler metadata differs)";
         results.push({
           group: "topology",
-          key: `${name}.bytecode-hash`,
+          key: `${name}.bytecode`,
           severity: "pass",
-          expected: expectedHash,
-          actual: actualHash,
-          format: "bytes32",
+          expected: "matches built artefact",
+          actual: note,
         });
       }
-    } catch (e) {
-      results.push({
-        group: "topology",
-        key: `${name}.bytecode-hash`,
-        severity: "warning",
-        note: `could not resolve expected bytecode (${(e as Error).message})`,
-      });
     }
 
     // 4. ERC-1967 impl slot — only for contracts the deployment recorded an implementation for.
     // Driven by the artefact's "<Name>::Implementation" entry (ground truth) rather than a
     // hardcoded proxy set, so it self-maintains as topology changes (e.g. policies deployed
     // directly rather than behind a proxy won't false-fail with a zero impl slot).
-    const recordedImpl = implEntry(artefact, name);
     if (recordedImpl) {
       const slotRaw = await client.getStorageAt({
         address: entry.address,
