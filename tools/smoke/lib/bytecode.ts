@@ -17,6 +17,14 @@ import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
+// Deployment keys whose Solidity contract (and thus artefact filename) differs from the key.
+// Without this the artefact lookup finds nothing and bytecode degrades to a "could not resolve"
+// warning. (Both multicalls are instances of OwnedMulticall.)
+const ARTEFACT_ALIAS: Record<string, string> = {
+  DisablerMulticall: "OwnedMulticall",
+  RebalancerMulticall: "OwnedMulticall",
+};
+
 export type BytecodeMatch =
   | { kind: "exact"; profile: string }
   | { kind: "immutables"; count: number; profile: string }
@@ -51,7 +59,9 @@ const cache = new Map<string, Candidate[]>();
  */
 export function matchDeployedBytecode(name: string, onchain: string, repoRoot: string): BytecodeMatch {
   const baseName = name.split("::")[0]!;
-  const candidates = loadCandidates(baseName, repoRoot);
+  // Some deployment keys differ from the Solidity contract name; map to the real artefact.
+  const lookupName = ARTEFACT_ALIAS[baseName] ?? baseName;
+  const candidates = loadCandidates(lookupName, repoRoot);
   if (candidates.length === 0) return { kind: "no-artifact" };
 
   const on = strip0x(onchain).toLowerCase();
