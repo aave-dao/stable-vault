@@ -2,24 +2,33 @@
 // `as const` so viem can infer return shapes. Full ABIs from `out/` are not
 // imported — we don't need write functions, events, or errors.
 
+// Bucket tuple shared by per-asset and global rate-limit getters (RateLimitBucketLib.Bucket).
+const RATE_LIMIT_BUCKET = {
+  name: "",
+  type: "tuple",
+  components: [
+    { name: "capacity", type: "uint128" },
+    { name: "refillRate", type: "uint128" },
+    { name: "consumed", type: "uint128" },
+    { name: "lastRefillTimestamp", type: "uint64" },
+  ],
+} as const;
+
 export const DEPOSIT_POLICY_ABI = [
   {
     type: "function",
     name: "getDepositLimit",
     stateMutability: "view",
     inputs: [{ name: "asset", type: "address" }],
-    outputs: [
-      {
-        name: "",
-        type: "tuple",
-        components: [
-          { name: "capacity", type: "uint128" },
-          { name: "refillRate", type: "uint128" },
-          { name: "consumed", type: "uint128" },
-          { name: "lastRefillTimestamp", type: "uint64" },
-        ],
-      },
-    ],
+    outputs: [RATE_LIMIT_BUCKET],
+  },
+  {
+    // GlobalRateLimitedPolicy: the cross-asset normalized global cap.
+    type: "function",
+    name: "getGlobalDepositLimit",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [RATE_LIMIT_BUCKET],
   },
 ] as const;
 
@@ -33,18 +42,15 @@ export const FUNDS_BRIDGING_POLICY_ABI = [
       { name: "destChainId", type: "uint256" },
       { name: "bridgeAdapter", type: "address" },
     ],
-    outputs: [
-      {
-        name: "",
-        type: "tuple",
-        components: [
-          { name: "capacity", type: "uint128" },
-          { name: "refillRate", type: "uint128" },
-          { name: "consumed", type: "uint128" },
-          { name: "lastRefillTimestamp", type: "uint64" },
-        ],
-      },
-    ],
+    outputs: [RATE_LIMIT_BUCKET],
+  },
+  {
+    // GlobalRateLimitedPolicy: the cross-asset normalized global cap.
+    type: "function",
+    name: "getGlobalBridgingLimit",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [RATE_LIMIT_BUCKET],
   },
 ] as const;
 
@@ -371,6 +377,76 @@ export const BASE_CHAIN_GATEWAY_ABI = [
       { name: "bridgeAdapter", type: "address" },
     ],
     outputs: [{ name: "", type: "bytes32" }],
+  },
+  {
+    // Accounting-side wiring: the FundsHandler this gateway forwards through.
+    type: "function",
+    name: "getFundsHandler",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+  },
+  {
+    // Earning-side wiring: the counterparty (accounting) chain id.
+    type: "function",
+    name: "getAccountingChainId",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+] as const;
+
+// Bridge adapters (CcipAdapter / AdiAdapter) inherit BaseBridgeAdapter. Selector mapping is
+// CCIP-specific; getDestinationChainAdapter + getCrossChainController are the cross-chain wiring.
+export const BRIDGE_ADAPTER_ABI = [
+  {
+    type: "function",
+    name: "getChainSelector",
+    stateMutability: "view",
+    inputs: [{ name: "chainId", type: "uint256" }],
+    outputs: [{ name: "", type: "uint64" }],
+  },
+  {
+    type: "function",
+    name: "getChainId",
+    stateMutability: "view",
+    inputs: [{ name: "ccipChainSelector", type: "uint64" }],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "getDestinationChainAdapter",
+    stateMutability: "view",
+    inputs: [{ name: "chainId", type: "uint256" }],
+    outputs: [{ name: "", type: "address" }],
+  },
+  {
+    // AdiAdapter only: the a.DI CrossChainController this adapter routes through.
+    type: "function",
+    name: "getCrossChainController",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+  },
+] as const;
+
+export const POLICY_REGISTRY_ABI = [
+  {
+    type: "function",
+    name: "getPolicy",
+    stateMutability: "view",
+    inputs: [{ name: "policyId", type: "bytes32" }],
+    outputs: [{ name: "", type: "address" }],
+  },
+] as const;
+
+export const FUNDS_HANDLER_ABI = [
+  {
+    type: "function",
+    name: "getEarningChainIds",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256[]" }],
   },
 ] as const;
 

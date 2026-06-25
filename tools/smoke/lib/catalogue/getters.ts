@@ -4,7 +4,7 @@
 // Builders are split per-group for readability. Each builder returns
 // GetterSpec[] and the catalogue composer concatenates them.
 
-import { type Abi, type Address, getAddress } from "viem";
+import { type Abi, type Address, getAddress, keccak256, toBytes } from "viem";
 
 import { tryEntry } from "../artefact.js";
 import { buildAccessSpecs } from "./access-from-roles.js";
@@ -13,10 +13,13 @@ import {
   ALLOCATOR_ABI,
   ASSET_REGISTRY_ABI,
   BASE_CHAIN_GATEWAY_ABI,
+  BRIDGE_ADAPTER_ABI,
   CHAIN_BALANCE_ORACLE_ABI,
   DEPOSIT_POLICY_ABI,
   FUNDS_BRIDGING_POLICY_ABI,
+  FUNDS_HANDLER_ABI,
   IOU_TOKEN_ABI,
+  POLICY_REGISTRY_ABI,
   PRICE_ORACLE_ABI,
   SLIPPAGE_COVERAGE_VAULT_ABI,
   STABLE_VAULT_ABI,
@@ -53,6 +56,9 @@ export function buildGetterSpecs(args: BuildArgs): GetterSpec[] {
     ...buildSlippageCoverageVaultSpecs(args),
     ...buildOracleWiringSpecs(args),
     ...buildBridgeAdapterSpecs(args),
+    ...buildBridgeAdapterWiringSpecs(args),
+    ...buildPolicyRegistrySpecs(args),
+    ...buildCrossChainWiringSpecs(args),
     ...buildAccessSpecs(args),
   ];
 }
@@ -404,11 +410,44 @@ function buildDepositPolicySpecs(args: BuildArgs): GetterSpec[] {
   if (!depositPolicy) return [];
   const ac = (config.accountingChain ?? {}) as ChainConfig;
   const assets = (ac.assets ?? {}) as Record<Asset, string>;
-  const policy = ((ac.depositPolicy ?? {}) as ChainConfig).perAssetLimits as
+  const depositPolicyConfig = (ac.depositPolicy ?? {}) as ChainConfig;
+  const specs: GetterSpec[] = [];
+
+  // Global (cross-asset, normalized) deposit cap — GlobalRateLimitedPolicy.
+  const globalLimit = depositPolicyConfig.globalLimit as
+    | { capacity: string | number; refillRate: string | number }
+    | undefined;
+  if (globalLimit) {
+    specs.push(
+      bucketField(
+        "DepositPolicy",
+        "DepositPolicy.global.capacity",
+        depositPolicy.address,
+        DEPOSIT_POLICY_ABI as unknown as Abi,
+        "getGlobalDepositLimit",
+        [],
+        BigInt(globalLimit.capacity),
+        "capacity",
+        "assetWei",
+      ),
+      bucketField(
+        "DepositPolicy",
+        "DepositPolicy.global.refillRate",
+        depositPolicy.address,
+        DEPOSIT_POLICY_ABI as unknown as Abi,
+        "getGlobalDepositLimit",
+        [],
+        BigInt(globalLimit.refillRate),
+        "refillRate",
+        "assetWeiPerSec",
+      ),
+    );
+  }
+
+  const policy = depositPolicyConfig.perAssetLimits as
     | Record<Asset, { capacity: string | number; refillRate: string | number }>
     | undefined;
-  if (!policy) return [];
-  const specs: GetterSpec[] = [];
+  if (!policy) return specs;
   for (const asset of ASSETS) {
     const assetAddr = assets[asset];
     const limits = policy[asset];
@@ -450,14 +489,47 @@ function buildFundsBridgingPolicySpecs(args: BuildArgs): GetterSpec[] {
   const chainConfig = (config[chainKey(chain)] ?? {}) as ChainConfig;
   const remoteConfig = (config[chainKey(otherChain(chain))] ?? {}) as ChainConfig;
   const assets = (chainConfig.assets ?? {}) as Record<Asset, string>;
-  const bridging = ((chainConfig.fundsBridgingPolicy ?? {}) as ChainConfig).perAssetLimits as
+  const fbpConfig = (chainConfig.fundsBridgingPolicy ?? {}) as ChainConfig;
+  const specs: GetterSpec[] = [];
+
+  // Global (cross-asset, normalized) bridging cap — GlobalRateLimitedPolicy.
+  const globalLimit = fbpConfig.globalLimit as
+    | { capacity: string | number; refillRate: string | number }
+    | undefined;
+  if (globalLimit) {
+    specs.push(
+      bucketField(
+        "FundsBridgingPolicy",
+        "FundsBridgingPolicy.global.capacity",
+        fbp.address,
+        FUNDS_BRIDGING_POLICY_ABI as unknown as Abi,
+        "getGlobalBridgingLimit",
+        [],
+        BigInt(globalLimit.capacity),
+        "capacity",
+        "assetWei",
+      ),
+      bucketField(
+        "FundsBridgingPolicy",
+        "FundsBridgingPolicy.global.refillRate",
+        fbp.address,
+        FUNDS_BRIDGING_POLICY_ABI as unknown as Abi,
+        "getGlobalBridgingLimit",
+        [],
+        BigInt(globalLimit.refillRate),
+        "refillRate",
+        "assetWeiPerSec",
+      ),
+    );
+  }
+
+  const bridging = fbpConfig.perAssetLimits as
     | Record<Asset, { capacity: string | number; refillRate: string | number }>
     | undefined;
   const ccipAdapter = tryEntry(artefact, "CcipAdapter");
   const remoteChainId = remoteConfig.chainId as number | string | undefined;
-  if (!bridging || !ccipAdapter || remoteChainId === undefined) return [];
+  if (!bridging || !ccipAdapter || remoteChainId === undefined) return specs;
 
-  const specs: GetterSpec[] = [];
   for (const asset of ASSETS) {
     const assetAddr = assets[asset];
     const limits = bridging[asset];
@@ -709,6 +781,158 @@ function buildBridgeAdapterSpecs(args: BuildArgs): GetterSpec[] {
       format: "bytes32",
     });
   }
+  return specs;
+}
+
+// ---------- Bridge adapter wiring (CCIP chain-selector map, both directions) ----------
+
+function buildBridgeAdapterWiringSpecs(args: BuildArgs): GetterSpec[] {
+  const { artefact, config, chain } = args;
+  const ccipAdapter = tryEntry(artefact, "CcipAdapter");
+  if (!ccipAdapter) return [];
+  const remoteConfig = (config[chainKey(otherChain(chain))] ?? {}) as ChainConfig;
+  const remoteChainId = remoteConfig.chainId as number | string | undefined;
+  const remoteSelector = remoteConfig.ccipSelector as string | number | undefined;
+  if (remoteChainId === undefined || remoteSelector === undefined) return [];
+
+  // The local CCIP adapter maps the remote chain id <-> the remote chain's CCIP selector.
+  // Verifying both directions catches a half-configured mapping.
+  return [
+    {
+      group: "BridgeAdapters",
+      key: "CcipAdapter.chainSelector.forward",
+      address: ccipAdapter.address,
+      abi: BRIDGE_ADAPTER_ABI as unknown as Abi,
+      functionName: "getChainSelector",
+      args: [BigInt(remoteChainId)],
+      expected: BigInt(remoteSelector),
+      format: "uint",
+    },
+    {
+      group: "BridgeAdapters",
+      key: "CcipAdapter.chainSelector.reverse",
+      address: ccipAdapter.address,
+      abi: BRIDGE_ADAPTER_ABI as unknown as Abi,
+      functionName: "getChainId",
+      args: [BigInt(remoteSelector)],
+      expected: BigInt(remoteChainId),
+      format: "uint",
+    },
+  ];
+}
+
+// ---------- PolicyRegistry bindings (each policyId resolves to its deployed policy) ----------
+
+// policyId -> policy-contract artefact name, per chain. policyIds are keccak256 of the seed
+// string the consuming contract hard-codes (e.g. StableVault.DEPOSIT_POLICY_ID).
+function policySeedMap(chain: ChainKind): Array<[seed: string, artefactName: string]> {
+  return chain === "earning"
+    ? [
+        ["aave.stable-vault.EarningChainGateway.policy.bridge", "FundsBridgingPolicy"],
+        ["aave.stable-vault.EarningChainGateway.policy.withdrawal-execution", "WithdrawalExecutionPolicy"],
+      ]
+    : [
+        ["aave.stable-vault.StableVault.policy.deposit", "DepositPolicy"],
+        ["aave.stable-vault.StableVault.policy.withdrawal-execution", "WithdrawalExecutionPolicy"],
+        ["aave.stable-vault.FundsHandler.policy.bridge", "FundsBridgingPolicy"],
+      ];
+}
+
+function buildPolicyRegistrySpecs(args: BuildArgs): GetterSpec[] {
+  const { artefact, chain } = args;
+  const registry = tryEntry(artefact, "PolicyRegistry");
+  if (!registry) return [];
+  const specs: GetterSpec[] = [];
+  for (const [seed, artefactName] of policySeedMap(chain)) {
+    const policy =
+      tryEntry(artefact, artefactName) ??
+      (artefactName === "WithdrawalExecutionPolicy" ? tryEntry(artefact, "WithdrawalPolicy") : null);
+    if (!policy) continue;
+    const label = seed.split(".").pop()!;
+    specs.push({
+      group: "PolicyRegistry",
+      key: `PolicyRegistry.${label}`,
+      address: registry.address,
+      abi: POLICY_REGISTRY_ABI as unknown as Abi,
+      functionName: "getPolicy",
+      args: [keccak256(toBytes(seed))],
+      expected: policy.address,
+      format: "address",
+    });
+  }
+  return specs;
+}
+
+// ---------- Cross-chain wiring (gateway <-> handler, counterparty chain id, a.DI CCC) ----------
+
+function buildCrossChainWiringSpecs(args: BuildArgs): GetterSpec[] {
+  const { artefact, config, chain } = args;
+  const specs: GetterSpec[] = [];
+  const chainConfig = (config[chainKey(chain)] ?? {}) as ChainConfig;
+
+  if (chain === "accounting") {
+    const gateway = tryEntry(artefact, "AccountingChainGateway");
+    const fundsHandler = tryEntry(artefact, "FundsHandler");
+    if (gateway && fundsHandler) {
+      specs.push({
+        group: "Wiring",
+        key: "AccountingChainGateway.fundsHandler",
+        address: gateway.address,
+        abi: BASE_CHAIN_GATEWAY_ABI,
+        functionName: "getFundsHandler",
+        expected: fundsHandler.address,
+        format: "address",
+      });
+    }
+    // FundsHandler must register the earning chain id.
+    const ec = (config.earningChain ?? {}) as ChainConfig;
+    const ecChainId = ec.chainId as number | string | undefined;
+    if (fundsHandler && ecChainId !== undefined) {
+      specs.push({
+        group: "Wiring",
+        key: `FundsHandler.earningChainRegistered.${ecChainId}`,
+        address: fundsHandler.address,
+        abi: FUNDS_HANDLER_ABI as unknown as Abi,
+        functionName: "getEarningChainIds",
+        expected: true,
+        format: "bool",
+        pick: (raw) => (raw as readonly bigint[]).some((id) => id === BigInt(ecChainId)),
+      });
+    }
+  }
+
+  if (chain === "earning") {
+    const gateway = tryEntry(artefact, "EarningChainGateway");
+    const ac = (config.accountingChain ?? {}) as ChainConfig;
+    const acChainId = ac.chainId as number | string | undefined;
+    if (gateway && acChainId !== undefined) {
+      specs.push({
+        group: "Wiring",
+        key: "EarningChainGateway.accountingChainId",
+        address: gateway.address,
+        abi: BASE_CHAIN_GATEWAY_ABI,
+        functionName: "getAccountingChainId",
+        expected: BigInt(acChainId),
+        format: "uint",
+      });
+    }
+  }
+
+  // a.DI adapter routes through the configured CrossChainController.
+  const adiAdapter = tryEntry(artefact, "AdiAdapter");
+  const ccc = ((chainConfig.adi ?? {}) as { crossChainController?: string }).crossChainController;
+  if (adiAdapter && ccc) {
+    specs.push({
+      group: "Wiring",
+      key: "AdiAdapter.crossChainController",
+      address: adiAdapter.address,
+      abi: BRIDGE_ADAPTER_ABI as unknown as Abi,
+      functionName: "getCrossChainController",
+      expected: getAddress(ccc),
+      format: "address",
+    });
+  }
+
   return specs;
 }
 
