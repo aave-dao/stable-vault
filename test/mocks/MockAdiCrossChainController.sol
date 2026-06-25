@@ -15,6 +15,7 @@ contract MockAdiCrossChainController {
     uint256 public retryTransactionCallCount;
     uint256 public nativeFee;
     uint256 public successfulQuotes = 1;
+    uint256 internal _requiredForwardingSuccesses = 1;
     uint256 internal _optimalBandwidth;
     uint256 internal _expectedQuoteGasLimit;
     uint256 internal _expectedQuoteBandwidth;
@@ -84,6 +85,10 @@ contract MockAdiCrossChainController {
         return _optimalBandwidth;
     }
 
+    function getRequiredForwardingSuccessesByChain(uint256) external view returns (uint256) {
+        return _requiredForwardingSuccesses;
+    }
+
     function retryEnvelope(Envelope calldata envelope, uint256 gasLimit) external returns (bytes32 transactionId) {
         retryEnvelopeCallCount++;
         _recordRetryEnvelope(envelope, gasLimit);
@@ -103,6 +108,10 @@ contract MockAdiCrossChainController {
 
     function setSuccessfulQuotes(uint256 newSuccessfulQuotes) external {
         successfulQuotes = newSuccessfulQuotes;
+    }
+
+    function setRequiredForwardingSuccesses(uint256 newRequiredForwardingSuccesses) external {
+        _requiredForwardingSuccesses = newRequiredForwardingSuccesses;
     }
 
     function setOptimalBandwidth(uint256 newOptimalBandwidth) external {

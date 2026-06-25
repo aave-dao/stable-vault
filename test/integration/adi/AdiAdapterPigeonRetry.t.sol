@@ -32,7 +32,7 @@ contract AdiAdapterPigeonRetry is AdiAdapterPigeonLocalForkBase {
         assertEq(_arbGateway.receiveCount(), 0, "original transaction should not be relayed");
 
         vm.selectFork(_ethFork);
-        _setGuardian(_ethCcc, _stableVaultsOwner);
+        _setGuardian(_ethCcc, _cccOwnerOf(_ethCcc));
         uint256 retryNativeFee = _prepareRetryFees(_ethAdiAdapter, encodedTransaction, bridgeAdaptersToRetry);
 
         vm.expectRevert();
@@ -82,7 +82,7 @@ contract AdiAdapterPigeonRetry is AdiAdapterPigeonLocalForkBase {
         assertEq(_arbGateway.receiveCount(), 0, "original envelope should not be relayed");
 
         vm.selectFork(_ethFork);
-        _setGuardian(_ethCcc, _stableVaultsOwner);
+        _setGuardian(_ethCcc, _cccOwnerOf(_ethCcc));
         uint256 quoteBw = ICrossChainForwarder(_ethCcc).getOptimalBandwidthByChain(envelope.destinationChainId);
         uint256 badRetryFee;
         (badRetryFee,,) = _ethAdiAdapter.quoteRetryEnvelope(envelope, DEFAULT_GAS_LIMIT, quoteBw);

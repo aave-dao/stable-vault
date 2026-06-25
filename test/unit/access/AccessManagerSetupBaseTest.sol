@@ -86,6 +86,29 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         return false;
     }
 
+    function _secondaryAdminRateLimitRoles() internal view returns (RolesConfig.Role[] memory) {
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](16);
+
+        roles[0] = RolesConfig.getRole__raiseDepositCapacity();
+        roles[1] = RolesConfig.getRole__raiseDepositRefillRate();
+        roles[2] = RolesConfig.getRole__raiseGlobalDepositCapacity();
+        roles[3] = RolesConfig.getRole__raiseGlobalDepositRefillRate();
+        roles[4] = RolesConfig.getRole__raiseBridgingCapacity();
+        roles[5] = RolesConfig.getRole__raiseBridgingRefillRate();
+        roles[6] = RolesConfig.getRole__raiseGlobalBridgingCapacity();
+        roles[7] = RolesConfig.getRole__raiseGlobalBridgingRefillRate();
+        roles[8] = RolesConfig.getRole__raiseRedemptionCapacity();
+        roles[9] = RolesConfig.getRole__raiseRedemptionRefillRate();
+        roles[10] = RolesConfig.getRole__raisePullCapPerTx();
+        roles[11] = RolesConfig.getRole__raiseWindowCap();
+        roles[12] = RolesConfig.getRole__lowerWindowSeconds();
+        roles[13] = RolesConfig.getRole__setMaxSlippageBps();
+        roles[14] = RolesConfig.getRole__setOverrideMaxSlippageBps();
+        roles[15] = RolesConfig.getRole__sweepSlippageCoverageVault();
+
+        return roles;
+    }
+
     function _assertProfileHasExactlyTheseRoles(address profile, uint64[] memory expectedRoleIds) internal view {
         uint64[] memory allRoleIds = _getAllRoleIds();
         for (uint256 i = 0; i < allRoleIds.length; i++) {
@@ -182,6 +205,33 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         }
     }
 
+    function test_rateLimitRoles_areGrantedToSecondaryAdminWithAdminGuardians() public view {
+        RolesConfig.Role[] memory roles = _secondaryAdminRateLimitRoles();
+        IAccessManager accessManager = IAccessManager(_accessManager());
+        address mainAdmin = _getProfile__MainAdmin();
+        address secondaryAdmin = _getProfile__SecondaryAdmin();
+
+        for (uint256 i = 0; i < roles.length; i++) {
+            string memory selector = vm.toString(bytes32(roles[i].selector));
+
+            assertFalse(roles[i].hasCriticalRisk, string.concat("role should be secondary-admin eligible ", selector));
+            assertEq(roles[i].delay, HIGH_DELAY, string.concat("role should keep HIGH_DELAY ", selector));
+            assertEq(
+                roles[i].guardianRoleId,
+                RolesConfig.ADMIN_ROLE_GUARDIAN_ROLE,
+                string.concat("role should keep admin guardian ", selector)
+            );
+
+            (bool mainHas, uint32 mainDelay) = accessManager.hasRole(roles[i].roleId, mainAdmin);
+            assertTrue(mainHas, string.concat("MainAdmin should have role ", selector));
+            assertEq(mainDelay, HIGH_DELAY, string.concat("MainAdmin delay mismatch ", selector));
+
+            (bool secondaryHas, uint32 secondaryDelay) = accessManager.hasRole(roles[i].roleId, secondaryAdmin);
+            assertTrue(secondaryHas, string.concat("SecondaryAdmin should have role ", selector));
+            assertEq(secondaryDelay, HIGH_DELAY, string.concat("SecondaryAdmin delay mismatch ", selector));
+        }
+    }
+
     function test_withdrawalPolicyManagerProfile_hasTheExpectedRoles() public view {
         uint64[] memory expected = new uint64[](2);
         expected[0] = RolesConfig.getRole__setDefaultFeeBps().roleId;
@@ -224,7 +274,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
     }
 
     function test_disablerProfile_hasTheExpectedRoles() public view {
-        uint64[] memory expected = new uint64[](20);
+        uint64[] memory expected = new uint64[](22);
         // Allocator (defensive)
         expected[0] = RolesConfig.getRole__rebalance().roleId;
         expected[1] = RolesConfig.getRole__removeStrategy().roleId;
@@ -240,19 +290,21 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         expected[9] = RolesConfig.getRole__removeFundsBridgeAdapter().roleId;
         // WithdrawalExecutionPolicy
         expected[10] = RolesConfig.getRole__removeSigner().roleId;
-        expected[11] = RolesConfig.getRole__lowerRedemptionCapacity().roleId;
-        expected[12] = RolesConfig.getRole__lowerRedemptionRefillRate().roleId;
         // SlippageCoverageVault
         // raiseWindowSeconds is tightening (longer window = slower rate), even though the prefix says raise.
-        expected[13] = RolesConfig.getRole__lowerPullCapPerTx().roleId;
-        expected[14] = RolesConfig.getRole__lowerWindowCap().roleId;
-        expected[15] = RolesConfig.getRole__raiseWindowSeconds().roleId;
+        expected[11] = RolesConfig.getRole__lowerPullCapPerTx().roleId;
+        expected[12] = RolesConfig.getRole__lowerWindowCap().roleId;
+        expected[13] = RolesConfig.getRole__raiseWindowSeconds().roleId;
         // DepositPolicy
-        expected[16] = RolesConfig.getRole__lowerDepositCapacity().roleId;
-        expected[17] = RolesConfig.getRole__lowerDepositRefillRate().roleId;
+        expected[14] = RolesConfig.getRole__lowerDepositCapacity().roleId;
+        expected[15] = RolesConfig.getRole__lowerDepositRefillRate().roleId;
+        expected[16] = RolesConfig.getRole__lowerGlobalDepositCapacity().roleId;
+        expected[17] = RolesConfig.getRole__lowerGlobalDepositRefillRate().roleId;
         // FundsBridgingPolicy
         expected[18] = RolesConfig.getRole__lowerBridgingCapacity().roleId;
         expected[19] = RolesConfig.getRole__lowerBridgingRefillRate().roleId;
+        expected[20] = RolesConfig.getRole__lowerGlobalBridgingCapacity().roleId;
+        expected[21] = RolesConfig.getRole__lowerGlobalBridgingRefillRate().roleId;
         _assertProfileHasExactlyTheseRoles(_getProfile__Disabler(), expected);
 
         for (uint256 i = 0; i < expected.length; i++) {
@@ -382,6 +434,26 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
                 roles[i].delay,
                 string.concat("Wrong grant delay for role ", vm.toString(uint256(roles[i].roleId)))
             );
+        }
+    }
+
+    function test_allRoles_guardianTierMatchesDelayTier() public view {
+        RolesConfig.Role[] memory roles = RolesConfig.getAllFunctionBasedRoles();
+        for (uint256 i = 0; i < roles.length; i++) {
+            string memory selector = vm.toString(roles[i].selector);
+            if (roles[i].delay == RolesConfig.NO_DELAY) {
+                assertEq(
+                    roles[i].guardianRoleId,
+                    RolesConfig.OPERATIONAL_ROLE_GUARDIAN_ROLE,
+                    string.concat("Instant role must use the operational guardian ", selector)
+                );
+            } else {
+                assertEq(
+                    roles[i].guardianRoleId,
+                    RolesConfig.ADMIN_ROLE_GUARDIAN_ROLE,
+                    string.concat("Delayed role must use the admin guardian ", selector)
+                );
+            }
         }
     }
 
@@ -656,6 +728,50 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         _assertCanCall(admin, _proxyAdmin(), ProxyAdmin.upgradeAndCall.selector, false, 0);
     }
 
+    function test_canCall_secondaryAdmin_rateLimitRoles() public view {
+        address admin = _getProfile__SecondaryAdmin();
+
+        address fundsBridgingPolicy = getFundsBridgingPolicyAddress(_deployer());
+        _assertCanCall(
+            admin, fundsBridgingPolicy, FundsBridgingPolicy.raiseBridgingCapacity.selector, false, HIGH_DELAY
+        );
+        _assertCanCall(
+            admin, fundsBridgingPolicy, FundsBridgingPolicy.raiseBridgingRefillRate.selector, false, HIGH_DELAY
+        );
+
+        address withdrawalExecutionPolicy = getWithdrawalExecutionPolicyAddress(_deployer());
+        _assertCanCall(
+            admin,
+            withdrawalExecutionPolicy,
+            WithdrawalExecutionPolicy.raiseRedemptionCapacity.selector,
+            false,
+            HIGH_DELAY
+        );
+        _assertCanCall(
+            admin,
+            withdrawalExecutionPolicy,
+            WithdrawalExecutionPolicy.raiseRedemptionRefillRate.selector,
+            false,
+            HIGH_DELAY
+        );
+
+        address slippageCoverageVault = getSlippageCoverageVaultAddress(_deployer());
+        _assertCanCall(
+            admin, slippageCoverageVault, SlippageCoverageVault.raisePullCapPerTx.selector, false, HIGH_DELAY
+        );
+        _assertCanCall(admin, slippageCoverageVault, SlippageCoverageVault.raiseWindowCap.selector, false, HIGH_DELAY);
+        _assertCanCall(
+            admin, slippageCoverageVault, SlippageCoverageVault.lowerWindowSeconds.selector, false, HIGH_DELAY
+        );
+        _assertCanCall(
+            admin, slippageCoverageVault, SlippageCoverageVault.setMaxSlippageBps.selector, false, HIGH_DELAY
+        );
+        _assertCanCall(
+            admin, slippageCoverageVault, SlippageCoverageVault.setOverrideMaxSlippageBps.selector, false, HIGH_DELAY
+        );
+        _assertCanCall(admin, slippageCoverageVault, SlippageCoverageVault.sweep.selector, false, HIGH_DELAY);
+    }
+
     function test_canCall_rebalancer() public view {
         address rebalancer = _getProfile__Rebalancer();
 
@@ -692,6 +808,20 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         _assertCanCall(disabler, getAllocatorAddress(_deployer()), IAllocator.addStrategy.selector, false, 0);
         _assertCanCall(disabler, getAllocatorAddress(_deployer()), IAllocator.topUp.selector, false, 0);
         _assertCanCall(disabler, getAllocatorAddress(_deployer()), IAllocator.trustStrategy.selector, false, 0);
+        _assertCanCall(
+            disabler,
+            getWithdrawalExecutionPolicyAddress(_deployer()),
+            WithdrawalExecutionPolicy.lowerRedemptionCapacity.selector,
+            false,
+            0
+        );
+        _assertCanCall(
+            disabler,
+            getWithdrawalExecutionPolicyAddress(_deployer()),
+            WithdrawalExecutionPolicy.lowerRedemptionRefillRate.selector,
+            false,
+            0
+        );
     }
 
     function test_canCall_withdrawalPolicyManager() public view {
@@ -962,6 +1092,26 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         assertEq(accessManager.getSchedule(operationId), 0, "Operation should be canceled");
     }
 
+    function test_mainAdminGuardian_canCancelSecondaryAdminRateLimitOperation() public {
+        IAccessManager accessManager = IAccessManager(_accessManager());
+        address mainAdmin = _getProfile__MainAdmin();
+        address secondaryAdmin = _getProfile__SecondaryAdmin();
+        address target = getSlippageCoverageVaultAddress(_deployer());
+
+        bytes memory callData = abi.encodeCall(SlippageCoverageVault.raisePullCapPerTx, (makeAddr("asset"), uint256(1)));
+        bytes32 operationId = accessManager.hashOperation(secondaryAdmin, target, callData);
+
+        vm.prank(secondaryAdmin);
+        accessManager.schedule(target, callData, 0);
+
+        assertTrue(accessManager.getSchedule(operationId) > 0, "Operation should be scheduled");
+
+        vm.prank(mainAdmin);
+        accessManager.cancel(secondaryAdmin, target, callData);
+
+        assertEq(accessManager.getSchedule(operationId), 0, "Operation should be canceled");
+    }
+
     ////// SecondaryAdmin cannot cancel admin-tier operations //////
 
     function test_secondaryAdmin_cannotCancelAdminTierOperation() public {
@@ -1095,6 +1245,34 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         accessManager.grantRole(role.roleId, newAddr, 0);
 
         // SecondaryAdmin tries revokeRole -> reverts
+        vm.prank(secondary);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessManager.AccessManagerUnauthorizedAccount.selector,
+                secondary,
+                RolesConfig.ADMIN_ROLE_GUARDIAN_ROLE
+            )
+        );
+        accessManager.revokeRole(role.roleId, _getProfile__MainAdmin());
+    }
+
+    function test_secondaryAdmin_cannotGrantOrRevokeRateLimitRoles() public {
+        IAccessManager accessManager = IAccessManager(_accessManager());
+        address secondary = _getProfile__SecondaryAdmin();
+        address newAddr = makeAddr("SECONDARY_RATE_LIMIT_TEST");
+
+        RolesConfig.Role memory role = RolesConfig.getRole__raisePullCapPerTx();
+
+        vm.prank(secondary);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessManager.AccessManagerUnauthorizedAccount.selector,
+                secondary,
+                RolesConfig.ADMIN_ROLE_GUARDIAN_ROLE
+            )
+        );
+        accessManager.grantRole(role.roleId, newAddr, role.delay);
+
         vm.prank(secondary);
         vm.expectRevert(
             abi.encodeWithSelector(

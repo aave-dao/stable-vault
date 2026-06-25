@@ -219,6 +219,10 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
         require(
             forwarder.getForwarderBridgeAdaptersByChain(remoteChainId).length > 0, "Adi CCC forwarder adapters not set"
         );
+        require(
+            forwarder.getRequiredForwardingSuccessesByChain(remoteChainId) > 0,
+            "Adi CCC required forwarding successes not set"
+        );
 
         ICrossChainReceiver receiver = ICrossChainReceiver(adiCrossChainController);
         require(
@@ -272,8 +276,14 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
         return _configAddress(string.concat(_chainConfigPrefix(), ".adi.crossChainController"));
     }
 
+    /// @dev File the deployment writes its addresses to (and reads back to resume). Virtual so fork tests can redirect
+    /// it to a throwaway path and avoid mutating the tracked deployment JSON.
+    function _deploymentOutputPath() internal view virtual returns (string memory) {
+        return _configString(string.concat(_chainConfigPrefix(), ".deploymentOutputPath"));
+    }
+
     function _deployedATokenVaultAddresses() internal view virtual override returns (address[] memory) {
-        return _readATokenVaultAddresses(_configString(string.concat(_chainConfigPrefix(), ".deploymentOutputPath")));
+        return _readATokenVaultAddresses(_deploymentOutputPath());
     }
 
     function _aTokenVaultProxyDeployerSaltSeed(address underlying) internal pure override returns (string memory) {
@@ -299,19 +309,11 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
     function _logDeployment(string memory name, string memory saltSeed, address addr) internal virtual override {
         string memory jsonObject =
             string.concat('{ "address": "', addr.toHexString(), '", "saltSeed": "', saltSeed, '" }');
-        vm.writeJson(
-            jsonObject,
-            _configString(string.concat(_chainConfigPrefix(), ".deploymentOutputPath")),
-            string.concat(".", name)
-        );
+        vm.writeJson(jsonObject, _deploymentOutputPath(), string.concat(".", name));
     }
 
     function _logATokenVaultDeployments() internal override {
-        vm.writeJson(
-            _buildATokenVaultsJson(),
-            _configString(string.concat(_chainConfigPrefix(), ".deploymentOutputPath")),
-            ".aTokenVaults"
-        );
+        vm.writeJson(_buildATokenVaultsJson(), _deploymentOutputPath(), ".aTokenVaults");
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -544,6 +546,27 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
         _initBridgingLimit(policy, _gho(), destChainId, bridgeAdapter, string.concat(limitsPrefix, ".gho"));
         _initBridgingLimit(policy, _usdc(), destChainId, bridgeAdapter, string.concat(limitsPrefix, ".usdc"));
         _initBridgingLimit(policy, _usdt(), destChainId, bridgeAdapter, string.concat(limitsPrefix, ".usdt"));
+        _initGlobalBridgingLimit(policy, string.concat(_chainConfigPrefix(), ".fundsBridgingPolicy.globalLimit"));
+    }
+
+    function _initGlobalBridgingLimit(FundsBridgingPolicy policy, string memory configKey) private {
+        uint128 capacity = _configUint128(string.concat(configKey, ".capacity"));
+        uint128 refillRate = _configUint128(string.concat(configKey, ".refillRate"));
+        RateLimitBucketLib.Bucket memory bucket = policy.getGlobalBridgingLimit();
+        if (bucket.capacity < capacity) {
+            policy.raiseGlobalBridgingCapacity(capacity);
+        } else {
+            /// @custom:tx-already-executed-check Capacity matches target; reject drift above target.
+            require(bucket.capacity == capacity, "global bridging capacity mismatch");
+            logSkip("_initGlobalBridgingLimit", "global bridging capacity");
+        }
+        if (bucket.refillRate < refillRate) {
+            policy.raiseGlobalBridgingRefillRate(refillRate);
+        } else {
+            /// @custom:tx-already-executed-check Refill rate matches target; reject drift above target.
+            require(bucket.refillRate == refillRate, "global bridging refill rate mismatch");
+            logSkip("_initGlobalBridgingLimit", "global bridging refill rate");
+        }
     }
 
     function _initBridgingLimit(
@@ -789,33 +812,43 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
         uint128 minRedemptionRefillRateRay = _configUint128(
             string.concat(_chainConfigPrefix(), ".withdrawalExecutionPolicy.minRedemptionRefillRateRay")
         );
-        bytes memory implCreationCode = abi.encodePacked(
+        bytes memory initCode = abi.encodePacked(
             type(WithdrawalExecutionPolicy).creationCode,
-            abi.encode(_withdrawalExecutionPolicyTarget(), minRedemptionCapacityRay, minRedemptionRefillRateRay)
+            abi.encode(
+                getAccessManagerAddress(_deployer()),
+                _withdrawalExecutionPolicyTarget(),
+                uint16(0),
+                minRedemptionCapacityRay,
+                minRedemptionRefillRateRay
+            )
         );
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
-            _assertDeployedTransparentProxy(
-                predicted, implCreationCode, WITHDRAWAL_EXECUTION_POLICY_PROXY_ADMIN_OWNER, "WithdrawalExecutionPolicy"
+            // EIP712 bakes the deployment address into an immutable, so the runtime code is address-dependent and
+            // cannot be compared against a reference deploy. Verify the deployed contract's constructor-immutable
+            // config via its getters instead (the CREATE3 salt already pins the address). The default fee is NOT
+            // checked here: it is mutable and `_setupWithdrawalExecutionPolicy` sets it to the configured value, so on
+            // a resume after setup ran it would no longer be the constructor's zero. That fee is reconciled
+            // idempotently in `_setupWithdrawalExecutionPolicy`.
+            WithdrawalExecutionPolicy deployed = WithdrawalExecutionPolicy(predicted);
+            require(
+                deployed.authority() == getAccessManagerAddress(_deployer()),
+                "WithdrawalExecutionPolicy: authority mismatch"
+            );
+            require(
+                deployed.getMinRedemptionCapacity() == minRedemptionCapacityRay,
+                "WithdrawalExecutionPolicy: min redemption capacity mismatch"
+            );
+            require(
+                deployed.getMinRedemptionRefillRate() == minRedemptionRefillRateRay,
+                "WithdrawalExecutionPolicy: min redemption refill rate mismatch"
             );
             logSkip("_deployWithdrawalExecutionPolicy", "WithdrawalExecutionPolicy");
             _logDeployment("WithdrawalExecutionPolicy", WITHDRAWAL_EXECUTION_POLICY_SALT_SEED, predicted);
             return predicted;
         }
-        address implementation = address(
-            new WithdrawalExecutionPolicy(
-                _withdrawalExecutionPolicyTarget(), minRedemptionCapacityRay, minRedemptionRefillRateRay
-            )
-        );
-        _logDeployment("WithdrawalExecutionPolicy::Implementation", "", implementation);
-        address withdrawalExecutionPolicy = _deployTransparentProxy_create3({
-            namespacedSaltSeed: WITHDRAWAL_EXECUTION_POLICY_SALT_SEED,
-            deployer: _deployer(),
-            implementation: implementation,
-            proxyAdminOwner: WITHDRAWAL_EXECUTION_POLICY_PROXY_ADMIN_OWNER,
-            initCalldata: abi.encodeCall(
-                WithdrawalExecutionPolicy.initialize, (getAccessManagerAddress(_deployer()), 0)
-            )
+        address withdrawalExecutionPolicy = _deploy_create3({
+            namespacedSaltSeed: WITHDRAWAL_EXECUTION_POLICY_SALT_SEED, deployer: _deployer(), initCode: initCode
         });
         require(withdrawalExecutionPolicy == predicted, "WithdrawalExecutionPolicy does not match expected address");
         _logDeployment("WithdrawalExecutionPolicy", WITHDRAWAL_EXECUTION_POLICY_SALT_SEED, withdrawalExecutionPolicy);
@@ -856,7 +889,6 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
                 getIouTokenAddress(_deployer()),
                 getGatewayAddress(_deployer()),
                 _iouTokenManagerVault(),
-                getTransferHelperAddress(_deployer()),
                 _isAccountingChain()
             )
         );

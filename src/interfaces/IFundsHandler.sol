@@ -7,18 +7,18 @@ pragma solidity ^0.8.22;
 /// @notice Interface for the FundsHandler contract.
 interface IFundsHandler {
     /// @notice Emitted when an earning chain is added.
-    /// @param chainId Chain id of the earning chain that was added.
+    /// @param chainId Chain ID of the earning chain that was added.
     event EarningChainAdded(uint256 chainId);
 
     /// @notice Emitted when an earning chain is removed.
-    /// @param chainId Chain id of the earning chain that was removed.
+    /// @param chainId Chain ID of the earning chain that was removed.
     event EarningChainRemoved(uint256 chainId);
 
-    /// @notice Thrown when the chain id is already present in the Earning chain set.
+    /// @notice Thrown when the chain ID is already present in the Earning chain set.
     /// @custom:selector 0xff514c10
     error ChainIdAlreadyPresent();
 
-    /// @notice Thrown when the chain id can not be removed because it is not present in the Earning chain set.
+    /// @notice Thrown when the chain ID can not be removed because it is not present in the Earning chain set.
     /// @custom:selector 0x20be9c4b
     error ChainIdNotPresent();
 
@@ -28,14 +28,15 @@ interface IFundsHandler {
 
     /// @notice Adds an earning chain to the list of supported earning chains.
     /// @dev An Earning chain must be added to bridge funds to the chain and to obtain balances on the chain from an
-    /// oracle.
-    /// @param chainId Chain id of the earning chain to add.
+    /// oracle. Reverts if the ChainBalanceOracle does not yet support the chain, since a registered chain that the
+    /// oracle does not support would make getAggregatedBalance() revert instead of treating the chain as stale.
+    /// @param chainId Chain ID of the earning chain to add.
     function addEarningChain(uint256 chainId) external;
 
     /// @notice Removes an earning chain from the list of supported earning chains.
     /// @dev An Earning chain must be removed to stop bridging funds to the chain and to stop obtaining balances on the
     /// chain from an oracle.
-    /// @param chainId Chain id of the earning chain to remove.
+    /// @param chainId Chain ID of the earning chain to remove.
     function removeEarningChain(uint256 chainId) external;
 
     /// @notice Forward a deposit to a liquidity source.
@@ -53,7 +54,7 @@ interface IFundsHandler {
     /// Gateway contract.
     /// @param asset Address of the asset to push to the destination chain.
     /// @param amount Amount of the asset to push to the destination chain.
-    /// @param chainId Chain id of the destination chain.
+    /// @param chainId Chain ID of the destination chain.
     /// @param bridgeAdapter The whitelisted bridge adapter to use for bridging the asset.
     /// @param receiverExecutionGasLimit Gas limit for destination receiver execution, including adapter receive logic,
     /// token handling, and gateway execution. Excludes bridge provider operations before and after the receiver call.

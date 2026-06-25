@@ -50,7 +50,7 @@ contract AdiAdapterPigeonLzDelegateConfig is AdiAdapterPigeonLocalForkBase {
         address lzEp = ILzAdapterLike(lzAdapter).LZ_ENDPOINT();
         address delegate = makeAddr("LZ_DELEGATE_CCC_CONTEXT_ARB");
 
-        vm.prank(_stableVaultsOwner);
+        vm.prank(_cccOwnerOf(_arbCcc));
         ICrossChainForwarderConfigAdapter(_arbCcc).configAdapter(ETH_CHAIN_ID, lzAdapter, abi.encode(delegate));
 
         address set = ILayerZeroEndpointV2Delegates(lzEp).delegates(_arbCcc);
@@ -68,7 +68,7 @@ contract AdiAdapterPigeonLzDelegateConfig is AdiAdapterPigeonLocalForkBase {
 
         address lzEp = ILzAdapterLike(_ethLzAdapter).LZ_ENDPOINT();
 
-        vm.prank(_stableVaultsOwner);
+        vm.prank(_cccOwnerOf(_ethCcc));
         IConfigurableLzAdapter(_ethLzAdapter).config(ARB_CHAIN_ID, data);
 
         address set = ILayerZeroEndpointV2Delegates(lzEp).delegates(_ethLzAdapter);
@@ -85,7 +85,7 @@ contract AdiAdapterPigeonLzDelegateConfig is AdiAdapterPigeonLocalForkBase {
         address lzEp = ILzAdapterLike(lzAdapter).LZ_ENDPOINT();
         address delegate = makeAddr("LZ_DELEGATE_ADAPTER_CONTEXT_ARB");
 
-        vm.prank(_stableVaultsOwner);
+        vm.prank(_cccOwnerOf(_arbCcc));
         IConfigurableLzAdapter(lzAdapter).config(ETH_CHAIN_ID, abi.encode(delegate));
 
         address set = ILayerZeroEndpointV2Delegates(lzEp).delegates(lzAdapter);

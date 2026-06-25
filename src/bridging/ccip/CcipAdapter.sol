@@ -28,13 +28,11 @@ import {Errors} from "src/types/Errors.sol";
 /// @dev This adapter will not ingest user-specific tokens and data, therefore the adapter does not support
 /// returning tokens to the original sender on the source chain (original sender will be the source chain CCIP adapter).
 /// @dev This adapter does not implement a defensive receiver pattern because it is assumed that message ingestion will
-/// not fail downstream due to issues other than OOG or if deposits into the Allocator are disabled.
-/// @dev If a revert occurs during the processing of a message, the message will never need to be retried (through
+/// not fail downstream due to issues other than OOG, deposits into the Allocator being disabled, or a transient
+/// StaleChainBalance revert (the latter clears once the balance oracle refreshes, after which the message is
+/// re-executed via manual execution through the CCIP offramp).
+/// @dev If a revert occurs during the processing of a message, the message will need to be retried (through
 /// manual execution through the CCIP offramp).
-/// @dev Implementing a defensive receiver pattern would require
-/// storing the message in the contract which can consume ~300k gas; this trade-off is deemed unnecessary given
-/// that the adapter will ingest messages for tokens that are supported, from a trusted source, and contain arbitrary
-/// data that can be parsed on the local Gateway if any arbitrary data is included in a message.
 /// @dev The adapter will revert if the source chain sender is not recognized, and the message will never need to be
 /// retried (through manual execution through the CCIP offramp).
 contract CcipAdapter is

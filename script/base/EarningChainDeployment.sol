@@ -27,7 +27,6 @@ abstract contract EarningChainDeployment is BaseChainDeployment, AccessManagerEa
 
     // Keep field order aligned with Foundry's JSON object encoding order (alphabetical by key).
     struct ExistingErc4626StrategyConfig {
-        string assetSymbol;
         address strategyAddress;
         string strategySymbol;
         address underlyingAddress;
@@ -350,11 +349,10 @@ abstract contract EarningChainDeployment is BaseChainDeployment, AccessManagerEa
 
         for (uint256 i = 0; i < existingStrategies.length; i++) {
             ExistingErc4626StrategyConfig memory strategy = existingStrategies[i];
-            address asset = _assetAddressFromSymbol(strategy.assetSymbol);
 
             require(strategy.strategyAddress != address(0), "ERC4626 strategy not set");
             require(strategy.underlyingAddress != address(0), "ERC4626 underlying not set");
-            require(strategy.underlyingAddress == asset, "ERC4626 underlying config mismatch");
+            require(_isRecognizedStableAsset(strategy.underlyingAddress), "ERC4626 underlying not a recognized asset");
             require(
                 IERC4626(strategy.strategyAddress).asset() == strategy.underlyingAddress, "ERC4626 underlying mismatch"
             );
@@ -372,17 +370,7 @@ abstract contract EarningChainDeployment is BaseChainDeployment, AccessManagerEa
         require(ghoStrategyConfigured, "GHO ERC4626 strategy not set");
     }
 
-    function _assetAddressFromSymbol(string memory assetSymbol) private view returns (address) {
-        bytes32 symbolHash = keccak256(bytes(assetSymbol));
-        if (symbolHash == keccak256("GHO")) {
-            return _gho();
-        }
-        if (symbolHash == keccak256("USDC")) {
-            return _usdc();
-        }
-        if (symbolHash == keccak256("USDT")) {
-            return _usdt();
-        }
-        revert("unsupported ERC4626 asset symbol");
+    function _isRecognizedStableAsset(address asset) private view returns (bool) {
+        return asset == _gho() || asset == _usdc() || asset == _usdt();
     }
 }

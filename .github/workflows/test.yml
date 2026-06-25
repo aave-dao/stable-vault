@@ -222,7 +222,7 @@ jobs:
         run: forge test -vvv
 
   pigeon-preprod:
-    name: Pigeon Preprod
+    name: Pigeon Prod
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -230,8 +230,13 @@ jobs:
     env:
       ALCHEMY_KEY: ${{ secrets.ALCHEMY_KEY || secrets.ALCHEMY_API_KEY }}
       ADI_FORK_MODE: deployed
-      ADI_DEPLOYMENT_ENV: preprod
+      ADI_DEPLOYMENT_ENV: prod
       ADI_DEPLOY_REF: main
+      # Pinned after the prod a.DI finalize + ProxyAdmin handoff and BEFORE the SV prod
+      # deployment, so the fork-deploy suite can deploy SV at its (then-empty) CREATE3
+      # addresses and validate against the live finalized prod a.DI.
+      ETH_FORK_BLOCK: "25290300"
+      ARB_FORK_BLOCK: "472184000"
     steps:
       - uses: actions/checkout@v4
         with:

@@ -11,6 +11,7 @@ import {
 import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
 import {IDepositPolicy} from "src/interfaces/IDepositPolicy.sol";
@@ -283,18 +284,33 @@ contract StableVault is
 
         uint256 fromConversionRate = _accrueSubVaultConversionRate(fromSubVaultId);
 
-        (uint256 guaranteedAmountRay, uint256 fromUserShares) =
-            _computeTransferShares(from, amountRay, fromSubVaultId, fromConversionRate);
+        // Cap the transfer at the value the sender's shares actually back (no original-deposit floor), rounding
+        // the share value down so the cap never overstates what the shares are worth. `fromConversionRate` is the
+        // rate `transfer` just accrued for this sub-vault, so it matches storage.
+        uint256 fromUserTotalShares = $storage().positions[from].shares;
+        uint256 totalAvailableAmountRayFromShares = fromUserTotalShares.rayMulDown(fromConversionRate);
+
+        // If the amountRay is greater than the total available amount from shares, the user should use transferAll()
+        // instead.
+        require(amountRay <= totalAvailableAmountRayFromShares, Errors.InsufficientFunds());
+
+        uint256 fromUserShares = amountRay.rayDivUp(fromConversionRate);
+
+        require(_areRemainingSharesRedeemable(from, fromUserShares, fromSubVaultId), Errors.InvalidAmount());
+        uint256 guaranteedAmountRay = _getAmountTakenFromOriginalDeposit(from, amountRay);
 
         uint256 toSubVaultId = _getOrAssignUserSubVaultId(to);
 
-        uint256 toUserShares;
+        uint256 toConversionRate;
         if (toSubVaultId == fromSubVaultId) {
-            toUserShares = fromUserShares;
+            toConversionRate = fromConversionRate;
         } else {
-            uint256 toConversionRate = _accrueSubVaultConversionRate(toSubVaultId);
-            toUserShares = amountRay.rayDivDown(toConversionRate);
+            toConversionRate = _accrueSubVaultConversionRate(toSubVaultId);
         }
+        // Issue recipient shares rounded down (sender's are burnt rounded up) recalculating them based on
+        // the `amountRay`, regardless of being in the same sub-vault or not, so we ensure that the aggregated
+        // value of all user positions in the system after the transfer is not greater than before the transfer.
+        uint256 toUserShares = amountRay.rayDivDown(toConversionRate);
         require(toUserShares > 0, Errors.InvalidAmount());
 
         _moveShares({
@@ -456,7 +472,7 @@ contract StableVault is
         address assetOut,
         uint256 minAmountOut,
         uint256 iouAmountRay,
-        bytes memory policyData
+        bytes calldata policyData
     ) external virtual override nonReentrant assertingTransferHelperBalanceFor(assetOut) {
         require(user == msg.sender, OnlyUser());
         require(iouAmountRay > 0, Errors.ZeroAmount());
@@ -544,6 +560,7 @@ contract StableVault is
     }
 
     /// @inheritdoc IStableVault
+    /// @dev `totalSupply` might not always match the sum of all `balanceOf`
     function totalSupply() external view override returns (uint256) {
         return _getActiveSubVaultsObligations();
     }
@@ -726,28 +743,6 @@ contract StableVault is
         return subVaultId;
     }
 
-    /// @dev Computes the shares to burn from sender and guaranteed amount for a transfer.
-    /// @dev Reverts with InvalidAmount() if remaining shares would be below dust threshold (use transferAll() instead).
-    function _computeTransferShares(address from, uint256 amountRay, uint256 fromSubVaultId, uint256 fromConversionRate)
-        internal
-        view
-        returns (uint256, uint256)
-    {
-        (uint256 fullAmountRay, uint256 fullGuaranteedAmountRay, uint256 fullSharesToRedeem) =
-            _previewFullWithdrawalRequest(from);
-        require(amountRay <= fullAmountRay, Errors.InsufficientFunds());
-
-        if (amountRay == fullAmountRay) {
-            return (fullGuaranteedAmountRay, fullSharesToRedeem);
-        }
-
-        uint256 fromUserShares = amountRay.rayDivUp(fromConversionRate);
-
-        require(_areRemainingSharesRedeemable(from, fromUserShares, fromSubVaultId), Errors.InvalidAmount());
-        uint256 guaranteedAmountRay = _getAmountTakenFromOriginalDeposit(from, amountRay);
-        return (guaranteedAmountRay, fromUserShares);
-    }
-
     function _areRemainingSharesRedeemable(address user, uint256 redeemedShares, uint256 subVaultId)
         internal
         view
@@ -840,9 +835,8 @@ contract StableVault is
         // Round down the withdrawal amount, so that the rounding is in favor of the protocol.
         uint256 actualAmountOfWithdrawalRay = sharesToRedeem.rayMulDown(conversionRate);
         uint256 originalDepositRay = $storage().positions[user].originalDepositRay;
-        // Due to rounding in rayDivDown (deposit) and rayMulDown (withdrawal),
-        // actualAmountOfWithdrawalRay can be slightly less than originalDepositRay.
-        // We guarantee the user gets at least their original deposit back.
+        // Rounding can make the share-based balance be slightly lower than the user's original deposit.
+        // Never report under the users' original deposit.
         if (actualAmountOfWithdrawalRay < originalDepositRay) {
             actualAmountOfWithdrawalRay = originalDepositRay;
         }
@@ -895,14 +889,22 @@ contract StableVault is
     }
 
     function _getUserBalance(address user) internal view returns (uint256) {
-        uint256 shares = $storage().positions[user].shares;
+        UserPosition storage position = $storage().positions[user];
+        uint256 shares = position.shares;
         if (shares == 0) {
             return 0;
         }
         // Round down the user balance, so that the rounding is in favor of the protocol.
-        return shares.rayMulDown(_previewSubVaultConversionRate($storage().positions[user].subVaultId));
+        uint256 balanceRay = shares.rayMulDown(_previewSubVaultConversionRate(position.subVaultId));
+        // Rounding can make the share-based balance be slightly lower than the user's original deposit.
+        // Never report under the users' original deposit.
+        return Math.max(balanceRay, position.originalDepositRay);
     }
 
+    /// @notice The returned value can be slightly underestimated. Original deposits per sub-vault are not tracked, and
+    /// the sum(max(totalShare * rate, originalDeposit per sub-vault)) can be higher than the max(sum(totalShare *
+    /// rate), originalDeposit global). However this divergence is minimal, and bounded by sum(originalDeposit -
+    /// totalShare * rate) for positions where originalDeposit > totalShare * rate.
     function _getActiveSubVaultsObligations() internal view returns (uint256) {
         uint256 activeSubVaultsObligations;
         uint256 activeSubVaultsCount = $storage().activeSubVaultsIds.length;
@@ -912,7 +914,9 @@ contract StableVault is
             activeSubVaultsObligations += $storage().subVaultById[subVaultId].totalShares
             .rayMulUp(_previewSubVaultConversionRate(subVaultId));
         }
-        return activeSubVaultsObligations;
+        // Rounding can make the share-based total obligations be slightly lower than the global original deposits.
+        // Never report less than the total of users' original deposits.
+        return Math.max(activeSubVaultsObligations, $storage().globalOriginalDepositsRay);
     }
 
     function _getVaultObligations() internal view returns (uint256) {
@@ -1011,7 +1015,7 @@ contract StableVault is
         address user,
         address assetOut,
         uint256 iouAmountRay,
-        bytes memory policyData
+        bytes calldata policyData
     ) internal returns (uint256) {
         address policy = IPolicyRegistry(POLICY_REGISTRY).getPolicy(WITHDRAWAL_EXECUTION_POLICY_ID);
         if (policy == address(0)) {

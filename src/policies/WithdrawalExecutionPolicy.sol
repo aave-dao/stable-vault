@@ -2,17 +2,16 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.22;
 
-import {
-    AccessManagedUpgradeable
-} from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
-import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
+import {AccessManaged} from "@openzeppelin/contracts/access/manager/AccessManaged.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {EfficientHashLib} from "@solady/utils/EfficientHashLib.sol";
 
 import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 
 import {IWithdrawalExecutionPolicy} from "src/interfaces/IWithdrawalExecutionPolicy.sol";
 import {RateLimitBucketLib} from "src/libraries/RateLimitBucketLib.sol";
+import {GlobalRateLimitedPolicy} from "src/policies/base/GlobalRateLimitedPolicy.sol";
 import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
 
@@ -27,10 +26,9 @@ import {Errors} from "src/types/Errors.sol";
 /// @dev The fee is capped per-asset at a basis-point limit (itself bounded at 10.00%). A whitelisted signer can sign
 /// a personal fee denominated in RAY to charge an exact amount; this signed amount is clamped to the asset's bp cap,
 /// with the cap amount rounded up in favor of the protocol.
-/// @custom:upgradeable
-contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithdrawalExecutionPolicy {
-    using RateLimitBucketLib for RateLimitBucketLib.Bucket;
-
+/// @dev The redemption bucket is the global bucket inherited from `GlobalRateLimitedPolicy`. Amounts are already
+/// RAY-denominated, so `_normalizeToGlobalBucketUnit` is overridden to a no-op.
+contract WithdrawalExecutionPolicy is AccessManaged, EIP712, GlobalRateLimitedPolicy, IWithdrawalExecutionPolicy {
     /// @notice Signed personal fee data (decoded from WithdrawalExecutionIntent.policyData).
     /// @param personalFeeAmountRay The personal fee amount in RAY signed by a whitelisted signer. Used directly as
     /// the fee charged, capped by the asset-specific bp limit.
@@ -52,15 +50,6 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
         bool isSet;
     }
 
-    /// @custom:storage-location erc7201:aave.storage.WithdrawalExecutionPolicy
-    struct WithdrawalExecutionPolicyStorage {
-        uint16 defaultFeeBps;
-        mapping(address asset => AssetFeeConfig config) assetFeeConfigs;
-        mapping(address account => bool isSigner) isSigner;
-        mapping(address signer => mapping(uint256 nonce => bool used)) wasNonceUsed;
-        RateLimitBucketLib.Bucket redemptionBucket;
-    }
-
     // EIP-712 typeHash:
     // keccak256("SignedFee(address user,address assetOut,uint256 iouAmountRay,uint256 personalFeeAmountRay,uint256
     // nonce,uint256 deadline)").
@@ -77,9 +66,14 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
     /// @dev Minimum redemption bucket refill rate, guaranteeing a minimum exit throughput.
     uint128 internal immutable MIN_REDEMPTION_REFILL_RATE;
 
-    // keccak256(abi.encode(uint256(keccak256("aave.storage.WithdrawalExecutionPolicy")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant STORAGE_SLOT_WITHDRAWAL_EXECUTION_POLICY =
-        0xe0ede6c18863c23819b4a5a3a3bb65fcec772573189c09b6a86a044b146cb900;
+    /// @dev Fallback fee in basis points, used when neither a personal nor an asset-specific fee is available.
+    uint16 internal _defaultFeeBps;
+
+    mapping(address asset => AssetFeeConfig config) internal _assetFeeConfigs;
+
+    mapping(address account => bool isSigner) internal _isSigner;
+
+    mapping(address signer => mapping(uint256 nonce => bool used)) internal _wasNonceUsed;
 
     /// @notice Emitted when the asset fee in basis points is set.
     event AssetFeeBpsSet(address indexed asset, uint16 assetFeeBps, bool isSet);
@@ -131,45 +125,26 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
         _;
     }
 
-    function $storage() private pure returns (WithdrawalExecutionPolicyStorage storage _storage) {
-        assembly {
-            _storage.slot := STORAGE_SLOT_WITHDRAWAL_EXECUTION_POLICY
-        }
-    }
-
     /// @dev Constructor.
+    /// @param accessManager The address of the IAccessManager contract used for handling access control.
     /// @param withdrawalExecutionPolicyApplier Address allowed to apply the withdrawal-execution policy.
+    /// @param defaultFeeBps The initial default fee in basis points.
     /// @param minRedemptionCapacity Floor for the redemption bucket capacity. May be zero to let the admin(s)
     /// halt redemptions via `lowerRedemptionCapacity(0)` in an emergency.
     /// @param minRedemptionRefillRate Floor for the redemption bucket refill rate. May be zero to let the admin(s)
     /// halt the refill via `lowerRedemptionRefillRate(0)` in an emergency.
     constructor(
+        address accessManager,
         address withdrawalExecutionPolicyApplier,
+        uint16 defaultFeeBps,
         uint128 minRedemptionCapacity,
         uint128 minRedemptionRefillRate
-    ) EIP712Upgradeable() {
+    ) AccessManaged(accessManager) EIP712("WithdrawalExecutionPolicy", "1") {
         require(withdrawalExecutionPolicyApplier != address(0), Errors.ZeroAddress());
-        _disableInitializers();
+        IAccessManager(accessManager).canCall(address(0), address(0), bytes4(0));
         WITHDRAWAL_EXECUTION_POLICY_APPLIER = withdrawalExecutionPolicyApplier;
         MIN_REDEMPTION_CAPACITY = minRedemptionCapacity;
         MIN_REDEMPTION_REFILL_RATE = minRedemptionRefillRate;
-    }
-
-    /// @dev Initializer.
-    /// @param accessManager The address of the IAccessManager contract used for handling access control.
-    /// @param defaultFeeBps The initial default fee in basis points.
-    function initialize(address accessManager, uint16 defaultFeeBps) external virtual initializer {
-        __WithdrawalExecutionPolicy_init(accessManager, defaultFeeBps);
-    }
-
-    function __WithdrawalExecutionPolicy_init(address accessManager, uint16 defaultFeeBps)
-        internal
-        virtual
-        onlyInitializing
-    {
-        IAccessManager(accessManager).canCall(address(0), address(0), bytes4(0));
-        __AccessManaged_init(accessManager);
-        __EIP712_init("WithdrawalExecutionPolicy", "1");
         _setDefaultFeeBps(defaultFeeBps);
     }
 
@@ -182,7 +157,7 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
         onlyWithdrawalExecutionPolicyApplier
         returns (uint256)
     {
-        $storage().redemptionBucket.consume(withdrawalExecution.iouAmountRay);
+        _consumeGlobalBucket(withdrawalExecution.assetOut, withdrawalExecution.iouAmountRay);
 
         (uint256 amountOutRay, address signer, uint256 nonce) = _previewWithdrawalExecutionPolicy(withdrawalExecution);
         if (signer != address(0)) {
@@ -205,7 +180,7 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
         returns (uint256)
     {
         (uint256 amountOutRay,,) = _previewWithdrawalExecutionPolicy(withdrawalExecution);
-        if (!$storage().redemptionBucket.canConsume(withdrawalExecution.iouAmountRay)) {
+        if (!_canConsumeGlobalBucket(withdrawalExecution.assetOut, withdrawalExecution.iouAmountRay)) {
             return 0;
         }
         return amountOutRay;
@@ -215,21 +190,21 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
     /// @param asset Address of the asset to get the configuration for.
     /// @return assetFeeConfig Configuration for the asset-specific fee.
     function getAssetFeeConfig(address asset) external view returns (AssetFeeConfig memory) {
-        return $storage().assetFeeConfigs[asset];
+        return _assetFeeConfigs[asset];
     }
 
     /// @notice Getter for the fallback fee in basis points which is used when a personal fee or asset-specific fee is
     /// not available.
     /// @return defaultFeeBps Fallback fee in basis points.
     function getDefaultFeeBps() external view returns (uint16) {
-        return $storage().defaultFeeBps;
+        return _defaultFeeBps;
     }
 
     /// @notice Getter for whether an account is a signer.
     /// @param account Address of the account to check if it is a signer or not.
     /// @return bool True if the account is a signer, false otherwise.
     function isSigner(address account) external view returns (bool) {
-        return $storage().isSigner[account];
+        return _isSigner[account];
     }
 
     /// @notice Getter for whether a nonce has been consumed by a signer.
@@ -237,12 +212,12 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
     /// @param nonce The nonce to check.
     /// @return bool True if the nonce has been used, false otherwise.
     function wasNonceUsed(address signer, uint256 nonce) external view returns (bool) {
-        return $storage().wasNonceUsed[signer][nonce];
+        return _wasNonceUsed[signer][nonce];
     }
 
     /// @notice Returns the current redemption bucket.
     function getRedemptionBucket() external view returns (RateLimitBucketLib.Bucket memory) {
-        return $storage().redemptionBucket;
+        return _globalBucketStorage();
     }
 
     /// @notice Returns the minimum redemption bucket capacity enforced by `lowerRedemptionCapacity`.
@@ -269,8 +244,8 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
         if (!isSet) {
             require(newAssetFeeBps == 0, Errors.InvalidParameter());
         }
-        $storage().assetFeeConfigs[asset].feeBps = newAssetFeeBps;
-        $storage().assetFeeConfigs[asset].isSet = isSet;
+        _assetFeeConfigs[asset].feeBps = newAssetFeeBps;
+        _assetFeeConfigs[asset].isSet = isSet;
         emit AssetFeeBpsSet(asset, newAssetFeeBps, isSet);
     }
 
@@ -300,48 +275,48 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
     /// @param nonce The nonce to invalidate.
     function invalidateNonce(address signer, uint256 nonce) external {
         require(msg.sender == signer, Errors.NotAuthorized());
-        require($storage().isSigner[signer], Errors.NotAuthorized());
-        require($storage().wasNonceUsed[signer][nonce] == false, NonceAlreadyUsed());
+        require(_isSigner[signer], Errors.NotAuthorized());
+        require(_wasNonceUsed[signer][nonce] == false, NonceAlreadyUsed());
         _markNonceAsUsed(signer, nonce);
     }
 
-    /// @notice Raises the redemption bucket capacity. The always-exit invariant is enforced by
-    /// `MIN_REDEMPTION_CAPACITY`, not by keeping the bucket finite.
+    /// @notice Raises the redemption bucket capacity.
+    /// @dev Cannot set below `MIN_REDEMPTION_CAPACITY`.
     /// @dev Starting with a full bucket, a caller could extract up to `2 * capacity` over a
     /// `capacity / refillRate`-second interval. Set `capacity` accordingly.
     function raiseRedemptionCapacity(uint128 newCapacity) external restricted {
-        uint128 oldCapacity = $storage().redemptionBucket.capacity;
-        $storage().redemptionBucket.raiseCapacity(newCapacity);
-        emit RedemptionCapacityRaised(oldCapacity, newCapacity);
+        require(newCapacity >= MIN_REDEMPTION_CAPACITY, BelowMinRedemptionCapacity());
+        emit RedemptionCapacityRaised(_raiseGlobalBucketCapacity(newCapacity), newCapacity);
     }
 
     /// @notice Lowers the redemption bucket capacity. Cannot drop below `MIN_REDEMPTION_CAPACITY`.
     function lowerRedemptionCapacity(uint128 newCapacity) external restricted {
         require(newCapacity >= MIN_REDEMPTION_CAPACITY, BelowMinRedemptionCapacity());
-        uint128 oldCapacity = $storage().redemptionBucket.capacity;
-        $storage().redemptionBucket.lowerCapacity(newCapacity);
-        emit RedemptionCapacityLowered(oldCapacity, newCapacity);
+        emit RedemptionCapacityLowered(_lowerGlobalBucketCapacity(newCapacity), newCapacity);
     }
 
     /// @notice Raises the redemption bucket refill rate.
+    /// @dev Cannot set below `MIN_REDEMPTION_REFILL_RATE`.
     function raiseRedemptionRefillRate(uint128 newRefillRate) external restricted {
-        uint128 oldRefillRate = $storage().redemptionBucket.refillRate;
-        $storage().redemptionBucket.raiseRefillRate(newRefillRate);
-        emit RedemptionRefillRateRaised(oldRefillRate, newRefillRate);
+        require(newRefillRate >= MIN_REDEMPTION_REFILL_RATE, BelowMinRedemptionRefillRate());
+        emit RedemptionRefillRateRaised(_raiseGlobalBucketRefillRate(newRefillRate), newRefillRate);
     }
 
     /// @notice Lowers the redemption bucket refill rate. Cannot drop below `MIN_REDEMPTION_REFILL_RATE`.
     function lowerRedemptionRefillRate(uint128 newRefillRate) external restricted {
         require(newRefillRate >= MIN_REDEMPTION_REFILL_RATE, BelowMinRedemptionRefillRate());
-        uint128 oldRefillRate = $storage().redemptionBucket.refillRate;
-        $storage().redemptionBucket.lowerRefillRate(newRefillRate);
-        emit RedemptionRefillRateLowered(oldRefillRate, newRefillRate);
+        emit RedemptionRefillRateLowered(_lowerGlobalBucketRefillRate(newRefillRate), newRefillRate);
     }
 
     //////////////////////////////// INTERNAL FUNCTIONS ////////////////////////////////
 
+    /// @dev Redemption amounts are already RAY-denominated (the global bucket's unit), so no conversion is needed.
+    function _normalizeToGlobalBucketUnit(address, uint256 iouAmountRay) internal pure override returns (uint256) {
+        return iouAmountRay;
+    }
+
     function _setSigner(address signer, bool whitelistAsSigner) internal {
-        $storage().isSigner[signer] = whitelistAsSigner;
+        _isSigner[signer] = whitelistAsSigner;
         emit SignerSet(signer, whitelistAsSigner);
     }
 
@@ -371,7 +346,7 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
     }
 
     function _markNonceAsUsed(address signer, uint256 nonce) internal {
-        $storage().wasNonceUsed[signer][nonce] = true;
+        _wasNonceUsed[signer][nonce] = true;
         emit NonceUsed(signer, nonce);
     }
 
@@ -389,8 +364,8 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
         require(signedFee.deadline >= block.timestamp, DeadlineExpired());
 
         signer = _recoverSigner(withdrawalExecution, signedFee);
-        require($storage().isSigner[signer], InvalidSignature());
-        require(!$storage().wasNonceUsed[signer][signedFee.nonce], NonceAlreadyUsed());
+        require(_isSigner[signer], InvalidSignature());
+        require(!_wasNonceUsed[signer][signedFee.nonce], NonceAlreadyUsed());
 
         return (signer, signedFee.nonce, signedFee.personalFeeAmountRay);
     }
@@ -417,16 +392,16 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
 
     /// @dev Returns the fee for an asset (asset-specific or default fallback).
     function _getAssetFeeBps(address assetOut) internal view returns (uint16) {
-        if ($storage().assetFeeConfigs[assetOut].isSet) {
-            return $storage().assetFeeConfigs[assetOut].feeBps;
+        if (_assetFeeConfigs[assetOut].isSet) {
+            return _assetFeeConfigs[assetOut].feeBps;
         } else {
-            return $storage().defaultFeeBps;
+            return _defaultFeeBps;
         }
     }
 
     function _setDefaultFeeBps(uint16 newDefaultFeeBps) internal {
         require(newDefaultFeeBps <= FEE_CAP_BPS, Errors.InvalidParameter());
-        $storage().defaultFeeBps = newDefaultFeeBps;
+        _defaultFeeBps = newDefaultFeeBps;
         emit DefaultFeeBpsSet(newDefaultFeeBps);
     }
 }

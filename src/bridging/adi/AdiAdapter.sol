@@ -82,6 +82,11 @@ contract AdiAdapter is BaseBridgeAdapter, RescuableNative, RescuableToken, IAdiB
 
         address destinationChainAdapter = _destinationChainAdapterOf[destinationChainId];
         require(destinationChainAdapter != address(0), Errors.InvalidParameter());
+        require(
+            ICrossChainForwarder(ADI_CROSS_CHAIN_CONTROLLER).getRequiredForwardingSuccessesByChain(destinationChainId)
+                > 0,
+            RequiredForwardingSuccessesNotSet()
+        );
 
         uint256 adjustedGasLimit = _withReceiverOverhead(payloadExecutionGasLimit);
         (uint256 nativeFee, ICrossChainForwarder.Fee[] memory fees, uint256 successfulQuotes) =
@@ -129,6 +134,9 @@ contract AdiAdapter is BaseBridgeAdapter, RescuableNative, RescuableToken, IAdiB
     }
 
     /// @inheritdoc IAdiBridgeAdapter
+    /// @notice `msg.sender` funds the retry. ERC-20 fee approvals must be granted to this adapter contract, with each
+    /// fee token's allowance limited to the expected fee rather than unlimited: the adapter pulls the quoted fees with
+    /// no per-transaction bound, so limited allowances cap the worst case if a fee quoter returns over-stated fees.
     function retryTransaction(
         bytes calldata encodedTransaction,
         uint256 gasLimit,
@@ -165,6 +173,9 @@ contract AdiAdapter is BaseBridgeAdapter, RescuableNative, RescuableToken, IAdiB
     }
 
     /// @inheritdoc IAdiBridgeAdapter
+    /// @notice `msg.sender` funds the retry. ERC-20 fee approvals must be granted to this adapter contract, with each
+    /// fee token's allowance limited to the expected fee rather than unlimited: the adapter pulls the quoted fees with
+    /// no per-transaction bound, so limited allowances cap the worst case if a fee quoter returns over-stated fees.
     function retryEnvelope(Envelope calldata envelope, uint256 gasLimit)
         external
         payable
@@ -241,6 +252,9 @@ contract AdiAdapter is BaseBridgeAdapter, RescuableNative, RescuableToken, IAdiB
         return keccak256(encodedTransaction);
     }
 
+    /// @dev Funds the CCC with the full quoted fee before forwarding. a.DI never refunds, so the quoted fee for any
+    /// leg that fails to send stays in the CCC; `_refundExcessNative` only returns native paid above the quote.
+    /// Leftovers are recoverable by the CCC owner.
     function _fundCrossChainController(address feePayer, uint256 nativeFee, ICrossChainForwarder.Fee[] memory fees)
         internal
     {

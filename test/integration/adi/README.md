@@ -1,8 +1,19 @@
 # ADI Pigeon Fork Tests
 
-These tests exercise the `AdiAdapter` against local Ethereum and Arbitrum forks,
-with a.DI bridge events relayed by Pigeon helpers. They are skipped during a
-normal `forge test` run unless `FORK_TEST=true` is set.
+These tests exercise the a.DI bridging path against local Ethereum and Arbitrum
+forks, with a.DI bridge events relayed by Pigeon helpers. Two layers run here:
+the `AdiAdapter` against locally-deployed mock periphery, and the real preprod
+`Deploy*Chain` scripts (`ForkDeployPreprod`, `FullSystemPreprodFork`) against the
+live preprod a.DI. They are skipped during a normal `forge test` run unless
+`FORK_TEST=true` is set.
+
+`ForkDeployPreprod` runs each chain's deploy script and checks the deterministic
+AccessManager / AdiAdapter land where the a.DI owner/guardian handoff delegated
+control. `FullSystemPreprodFork` deploys both chains and drives a full deposit ->
+bridge -> exchange -> burn-back round trip (plus a staged quorum/replay
+check) through the deployed contracts. Both redirect their deployment output to
+throwaway `deployments/preprod/v1/*.forktest.json` files (gitignored), so they
+never touch the tracked deployment JSONs.
 
 ## Prerequisites
 
@@ -41,7 +52,7 @@ By default, the wrapper:
 5. Runs:
 
 ```sh
-forge test --match-contract AdiAdapterPigeon -vvv
+forge test --match-contract 'AdiAdapterPigeon|ForkDeployPreprod|FullSystemPreprodFork' -vvv
 ```
 
 ## Run One Contract or Test
@@ -64,7 +75,10 @@ FORGE_TEST_ARGS="--match-test test_iouWithdrawalOverAdi_bridgeMintAndBurnLockedA
 
 The default mode uses an a.DI deployment already committed in `adi-deploy`.
 `ADI_DEPLOYMENT_ENV` selects the deployment subfolder under
-`deployments/stable-vaults/`:
+`deployments/stable-vaults/`, and the deploy fork tests (`ForkDeployPreprod`,
+`FullSystemPreprodFork`) read the matching Stable Vaults config
+(`config/deployment-config.<env>.jsonc`) so both sides run against the same
+environment:
 
 ```sh
 ADI_FORK_MODE=deployed ADI_DEPLOYMENT_ENV=preprod ./run-adi-pigeon-fork-test.sh
@@ -100,8 +114,12 @@ ADI_DEPLOYMENT_ENV=prod ./run-adi-pigeon-fork-test.sh
 ETH_PORT=9545 ARB_PORT=9546 ./run-adi-pigeon-fork-test.sh
 ENV_FILE=.env.forktest ./run-adi-pigeon-fork-test.sh
 RESTART_ANVIL=false ./run-adi-pigeon-fork-test.sh
-ETH_FORK_BLOCK=25131000 ARB_FORK_BLOCK=464535000 ./run-adi-pigeon-fork-test.sh
+ETH_FORK_BLOCK=25196860 ARB_FORK_BLOCK=467697210 ./run-adi-pigeon-fork-test.sh
 ```
+
+The default fork blocks are chosen per `ADI_DEPLOYMENT_ENV` (preprod and prod were
+deployed at different times, so each pins its own post-handoff block). Override
+`ETH_FORK_BLOCK` / `ARB_FORK_BLOCK` to fork elsewhere.
 
 `ETH_FORK_RPC` and `ARB_FORK_RPC` default to `http://127.0.0.1:8545` and
 `http://127.0.0.1:8546`, or to the ports set with `ETH_PORT` and `ARB_PORT`.
@@ -118,7 +136,6 @@ export FORK_TEST=true
 export ETH_FORK_RPC=http://127.0.0.1:8545
 export ARB_FORK_RPC=http://127.0.0.1:8546
 
-export STABLE_VAULTS_OWNER=<owner-from-adi-deploy-json>
 export ETH_CCC=<ethereum-cross-chain-controller>
 export ARB_CCC=<arbitrum-cross-chain-controller>
 export ETH_ARB_ADAPTER=<ethereum-arbitrum-native-adapter>
@@ -129,8 +146,14 @@ export ARB_CCIP_ADAPTER=<arbitrum-ccip-adapter>
 export ARB_LZ_ADAPTER=<arbitrum-layerzero-adapter>
 export ARB_HL_ADAPTER=<arbitrum-hyperlane-adapter>
 
-forge test --match-contract AdiAdapterPigeon -vvv
+forge build
+forge test --match-contract 'AdiAdapterPigeon|ForkDeployPreprod|FullSystemPreprodFork' -vvv
 ```
 
-The wrapper is preferred because it exports these values from the deployment
-JSONs automatically.
+The `forge build` is required: the deploy tests read the force-compiled
+`ATokenVaultMerklRewardClaimer` artifact from `out/`, which a sparse
+`forge test --match-contract` run does not produce on its own. Only the a.DI
+CrossChainController and bridge-adapter addresses come from env (the AMB endpoints
+and CCC owner are read on-chain from those adapters, and token addresses from the
+deploy config). The wrapper is preferred because it builds and exports these
+values automatically.

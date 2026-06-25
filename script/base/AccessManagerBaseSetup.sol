@@ -421,7 +421,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         address disablerProfile = _getProfile__Disabler();
         require(disablerProfile != address(0), "Disabler profile address not set");
 
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](20);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](22);
 
         // Allocator (defensive)
         roles[0] = RolesConfig.getRole__rebalance();
@@ -438,18 +438,20 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         roles[9] = RolesConfig.getRole__removeFundsBridgeAdapter();
         // WithdrawalExecutionPolicy
         roles[10] = RolesConfig.getRole__removeSigner();
-        roles[11] = RolesConfig.getRole__lowerRedemptionCapacity();
-        roles[12] = RolesConfig.getRole__lowerRedemptionRefillRate();
         // SlippageCoverageVault
-        roles[13] = RolesConfig.getRole__lowerPullCapPerTx();
-        roles[14] = RolesConfig.getRole__lowerWindowCap();
-        roles[15] = RolesConfig.getRole__raiseWindowSeconds();
+        roles[11] = RolesConfig.getRole__lowerPullCapPerTx();
+        roles[12] = RolesConfig.getRole__lowerWindowCap();
+        roles[13] = RolesConfig.getRole__raiseWindowSeconds();
         // DepositPolicy is Accounting Chain-only, but granted in both chain setups.
-        roles[16] = RolesConfig.getRole__lowerDepositCapacity();
-        roles[17] = RolesConfig.getRole__lowerDepositRefillRate();
+        roles[14] = RolesConfig.getRole__lowerDepositCapacity();
+        roles[15] = RolesConfig.getRole__lowerDepositRefillRate();
+        roles[16] = RolesConfig.getRole__lowerGlobalDepositCapacity();
+        roles[17] = RolesConfig.getRole__lowerGlobalDepositRefillRate();
         // FundsBridgingPolicy
         roles[18] = RolesConfig.getRole__lowerBridgingCapacity();
         roles[19] = RolesConfig.getRole__lowerBridgingRefillRate();
+        roles[20] = RolesConfig.getRole__lowerGlobalBridgingCapacity();
+        roles[21] = RolesConfig.getRole__lowerGlobalBridgingRefillRate();
 
         _grantRolesToProfile(disablerProfile, roles);
     }
@@ -652,13 +654,18 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
     function _setupTarget__FundsBridgingPolicy(address deployer) internal {
         address fundsBridgingPolicy = getFundsBridgingPolicyAddress(deployer);
 
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](4);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](8);
 
         // Bridging rate limit (raise/lower pairs adjacent)
         roles[0] = RolesConfig.getRole__raiseBridgingCapacity();
         roles[1] = RolesConfig.getRole__lowerBridgingCapacity();
         roles[2] = RolesConfig.getRole__raiseBridgingRefillRate();
         roles[3] = RolesConfig.getRole__lowerBridgingRefillRate();
+        // Global bridging rate limit (raise/lower pairs adjacent)
+        roles[4] = RolesConfig.getRole__raiseGlobalBridgingCapacity();
+        roles[5] = RolesConfig.getRole__lowerGlobalBridgingCapacity();
+        roles[6] = RolesConfig.getRole__raiseGlobalBridgingRefillRate();
+        roles[7] = RolesConfig.getRole__lowerGlobalBridgingRefillRate();
 
         _setTargetFunctionRoles(fundsBridgingPolicy, roles);
     }

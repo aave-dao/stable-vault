@@ -338,63 +338,28 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
                 })
             );
 
-        _adiHelper.helpMultiBridge(
-            AdiHelper.MultiBridgeArgs({
-                dstForkId: _ethFork,
-                dstCcipRouter: ETH_CCIP_ROUTER,
-                dstCcipChainSelector: ETH_CCIP_CHAIN_SELECTOR,
-                srcCcipOnRamp: address(0),
-                dstLzEndpoint: address(0),
-                srcHlMailbox: address(0),
-                dstHlMailbox: address(0),
-                logs: burnLogs
-            })
-        );
-        vm.selectFork(_ethFork);
-        assertEq(_accounting.iouTokenManager.getLockedBalance(), iouAmountRay, "single relay should not burn IOUs");
-        assertEq(
-            _accounting.iouToken.balanceOf(address(_accounting.iouTokenManager)),
-            iouAmountRay,
-            "single relay changed locked IOU balance"
-        );
-
-        _adiHelper.helpMultiBridge(
-            AdiHelper.MultiBridgeArgs({
-                dstForkId: _ethFork,
-                dstCcipRouter: address(0),
-                dstCcipChainSelector: 0,
-                srcCcipOnRamp: address(0),
-                dstLzEndpoint: LZ_ENDPOINT_V2,
-                srcHlMailbox: address(0),
-                dstHlMailbox: address(0),
-                logs: burnLogs
-            })
-        );
-        vm.selectFork(_ethFork);
-        assertEq(_accounting.iouTokenManager.getLockedBalance(), 0, "second relay should burn locked IOUs");
-        assertEq(_accounting.iouToken.balanceOf(address(_accounting.iouTokenManager)), 0, "manager still holds IOUs");
-        assertEq(_accounting.iouToken.totalSupply(), 0, "accounting IOU supply not burned");
-
-        _adiHelper.helpMultiBridge(
-            AdiHelper.MultiBridgeArgs({
-                dstForkId: _ethFork,
-                dstCcipRouter: address(0),
-                dstCcipChainSelector: 0,
-                srcCcipOnRamp: address(0),
-                dstLzEndpoint: address(0),
-                srcHlMailbox: ARB_HL_MAILBOX,
-                dstHlMailbox: ETH_HL_MAILBOX,
-                logs: burnLogs
-            })
-        );
-        vm.selectFork(_ethFork);
-        assertEq(_accounting.iouTokenManager.getLockedBalance(), 0, "extra relay should not relock or reburn IOUs");
-        assertEq(
-            _accounting.iouToken.balanceOf(address(_accounting.iouTokenManager)),
-            0,
-            "extra relay changed manager IOU balance"
-        );
-        assertEq(_accounting.iouToken.totalSupply(), 0, "extra relay changed accounting IOU supply");
+        // Relay the burn one bridge at a time: the locked accounting IOUs burn only once the receiver quorum is met,
+        // and over-quorum confirmations neither reburn nor relock. Quorum is read on-chain so this holds for both
+        // any on-chain quorum (e.g. 3-of-3 on preprod/prod).
+        uint256 quorum = _arbToEthQuorum();
+        for (uint256 confirmations = 1; confirmations <= 3; confirmations++) {
+            _relayArbToEthSingleAmb(burnLogs, confirmations - 1);
+            vm.selectFork(_ethFork);
+            uint256 expectedLocked = confirmations >= quorum ? 0 : iouAmountRay;
+            assertEq(
+                _accounting.iouTokenManager.getLockedBalance(),
+                expectedLocked,
+                "locked IOUs wrong for confirmation stage"
+            );
+            assertEq(
+                _accounting.iouToken.balanceOf(address(_accounting.iouTokenManager)),
+                expectedLocked,
+                "manager IOU balance wrong for confirmation stage"
+            );
+            if (confirmations >= quorum) {
+                assertEq(_accounting.iouToken.totalSupply(), 0, "accounting IOU supply not burned at/after quorum");
+            }
+        }
     }
 
     function test_iouBridge_replacesCcipDataOnlyBridgeWithAdi() public onlyForkTest {
@@ -461,14 +426,16 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
 
         uint256 nonce = vm.getNonce(address(this));
         address assetRegistryAddress = vm.computeCreateAddress(address(this), nonce + 1);
-        address withdrawalExecutionPolicyAddress = vm.computeCreateAddress(address(this), nonce + 3);
-        address iouTokenAddress = vm.computeCreateAddress(address(this), nonce + 4);
-        address iouTokenManagerAddress = vm.computeCreateAddress(address(this), nonce + 6);
-        address vaultAddress = vm.computeCreateAddress(address(this), nonce + 8);
-        address allocatorAddress = vm.computeCreateAddress(address(this), nonce + 10);
-        address fundsHandlerAddress = vm.computeCreateAddress(address(this), nonce + 12);
-        address gatewayAddress = vm.computeCreateAddress(address(this), nonce + 14);
-        address policyRegistryAddress = vm.computeCreateAddress(address(this), nonce + 15);
+        // WithdrawalExecutionPolicy is now a single non-upgradeable deploy (no impl+proxy), so every offset after it
+        // shifts down by one.
+        address withdrawalExecutionPolicyAddress = vm.computeCreateAddress(address(this), nonce + 2);
+        address iouTokenAddress = vm.computeCreateAddress(address(this), nonce + 3);
+        address iouTokenManagerAddress = vm.computeCreateAddress(address(this), nonce + 5);
+        address vaultAddress = vm.computeCreateAddress(address(this), nonce + 7);
+        address allocatorAddress = vm.computeCreateAddress(address(this), nonce + 9);
+        address fundsHandlerAddress = vm.computeCreateAddress(address(this), nonce + 11);
+        address gatewayAddress = vm.computeCreateAddress(address(this), nonce + 13);
+        address policyRegistryAddress = vm.computeCreateAddress(address(this), nonce + 14);
 
         stack.assetRegistry = AssetRegistry(
             address(
@@ -481,18 +448,8 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
         );
         require(address(stack.assetRegistry) == assetRegistryAddress, "asset registry address mismatch");
 
-        stack.withdrawalExecutionPolicy = WithdrawalExecutionPolicy(
-            address(
-                new TransparentUpgradeableProxy(
-                    address(
-                        new WithdrawalExecutionPolicy(
-                            vaultAddress, TEST_MIN_REDEMPTION_CAPACITY, TEST_MIN_REDEMPTION_REFILL_RATE
-                        )
-                    ),
-                    _proxyAdmin,
-                    abi.encodeCall(WithdrawalExecutionPolicy.initialize, (address(stack.accessManager), 0))
-                )
-            )
+        stack.withdrawalExecutionPolicy = new WithdrawalExecutionPolicy(
+            address(stack.accessManager), vaultAddress, 0, TEST_MIN_REDEMPTION_CAPACITY, TEST_MIN_REDEMPTION_REFILL_RATE
         );
         require(
             address(stack.withdrawalExecutionPolicy) == withdrawalExecutionPolicyAddress,
@@ -618,12 +575,14 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
 
         uint256 nonce = vm.getNonce(address(this));
         address assetRegistryAddress = vm.computeCreateAddress(address(this), nonce + 1);
-        address gatewayAddress = vm.computeCreateAddress(address(this), nonce + 10);
-        address withdrawalExecutionPolicyAddress = vm.computeCreateAddress(address(this), nonce + 3);
-        address iouTokenAddress = vm.computeCreateAddress(address(this), nonce + 4);
-        address iouTokenManagerAddress = vm.computeCreateAddress(address(this), nonce + 6);
-        address allocatorAddress = vm.computeCreateAddress(address(this), nonce + 8);
-        address policyRegistryAddress = vm.computeCreateAddress(address(this), nonce + 11);
+        // WithdrawalExecutionPolicy is now a single non-upgradeable deploy (no impl+proxy), so every offset after it
+        // shifts down by one.
+        address gatewayAddress = vm.computeCreateAddress(address(this), nonce + 9);
+        address withdrawalExecutionPolicyAddress = vm.computeCreateAddress(address(this), nonce + 2);
+        address iouTokenAddress = vm.computeCreateAddress(address(this), nonce + 3);
+        address iouTokenManagerAddress = vm.computeCreateAddress(address(this), nonce + 5);
+        address allocatorAddress = vm.computeCreateAddress(address(this), nonce + 7);
+        address policyRegistryAddress = vm.computeCreateAddress(address(this), nonce + 10);
 
         stack.assetRegistry = AssetRegistry(
             address(
@@ -636,18 +595,12 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
         );
         require(address(stack.assetRegistry) == assetRegistryAddress, "earning asset registry address mismatch");
 
-        stack.withdrawalExecutionPolicy = WithdrawalExecutionPolicy(
-            address(
-                new TransparentUpgradeableProxy(
-                    address(
-                        new WithdrawalExecutionPolicy(
-                            gatewayAddress, TEST_MIN_REDEMPTION_CAPACITY, TEST_MIN_REDEMPTION_REFILL_RATE
-                        )
-                    ),
-                    _proxyAdmin,
-                    abi.encodeCall(WithdrawalExecutionPolicy.initialize, (address(stack.accessManager), 0))
-                )
-            )
+        stack.withdrawalExecutionPolicy = new WithdrawalExecutionPolicy(
+            address(stack.accessManager),
+            gatewayAddress,
+            0,
+            TEST_MIN_REDEMPTION_CAPACITY,
+            TEST_MIN_REDEMPTION_REFILL_RATE
         );
         require(
             address(stack.withdrawalExecutionPolicy) == withdrawalExecutionPolicyAddress,

@@ -2,8 +2,6 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.22;
 
-import {IERC165} from "@openzeppelin/contracts/interfaces/IERC165.sol";
-
 import {IChainBalanceOracle} from "src/interfaces/IChainBalanceOracle.sol";
 import {IChainBalanceOracleAdapter} from "src/interfaces/IChainBalanceOracleAdapter.sol";
 import {IEarningChainStateProvider} from "src/interfaces/IEarningChainStateProvider.sol";
@@ -56,11 +54,6 @@ contract ChainlinkChainBalanceOracleAdapter is IChainBalanceOracleAdapter {
         return _getChainBalance(chainId);
     }
 
-    /// @inheritdoc IERC165
-    function supportsInterface(bytes4 interfaceId) public pure virtual override returns (bool) {
-        return interfaceId == type(IChainBalanceOracleAdapter).interfaceId || interfaceId == type(IERC165).interfaceId;
-    }
-
     function _getChainBalance(uint256 chainId) internal view returns (IChainBalanceOracle.ChainBalance memory) {
         require(chainId == EARNING_CHAIN_ID, InvalidChainId(chainId));
 
@@ -75,6 +68,14 @@ contract ChainlinkChainBalanceOracleAdapter is IChainBalanceOracleAdapter {
 
         // Get balance snapshot from bundle.
         bytes memory bundle = IBundleBaseAggregator(BUNDLE_AGGREGATOR_PROXY).latestBundle();
+        // No bundle has been published yet. Treat it as stale with a zero balance rather than reverting on decode,
+        // so the consuming oracle conservatively contributes 0 for this chain.
+        // Timestamps and block number are also 0 so they cannot be used for checks that require them to be up to date.
+        if (bundle.length == 0) {
+            return IChainBalanceOracle.ChainBalance({
+                balanceRay: 0, lastUpdateTimestamp: 0, sourceChainTimestamp: 0, sourceChainBlockNumber: 0, isStale: true
+            });
+        }
         IEarningChainStateProvider.State memory state = abi.decode(bundle, (IEarningChainStateProvider.State));
         require(state.version == SCHEMA_VERSION, InvalidEarningChainStateVersion(SCHEMA_VERSION, state.version));
         EarningChainStateSchemaV1.BalanceSnapshot memory balanceSnapshot =

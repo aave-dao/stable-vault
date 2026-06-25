@@ -182,7 +182,7 @@ interface IStableVault {
         address assetOut,
         uint256 minAmountOut,
         uint256 iouAmountRay,
-        bytes memory policyData
+        bytes calldata policyData
     ) external;
 
     /// @notice Getter for the default sub-vault.
@@ -210,10 +210,15 @@ interface IStableVault {
 
     /// @notice ERC20-style total Stable Vault position supply in RAY.
     /// @dev Excludes IOU supply; includes only active Stable Vault position obligations.
+    /// @dev Floored at the aggregate of all users' original deposits, so it never reports below the principal the
+    /// protocol guarantees is withdrawable even when per-user deposit rounding makes the share-derived value lower.
     /// @return supplyRay Total Stable Vault position supply in RAY.
     function totalSupply() external view returns (uint256 supplyRay);
 
     /// @notice ERC20-style Stable Vault balance in RAY for a given account.
+    /// @dev Floored at the account's original deposit: a full withdrawal is guaranteed to return at least that
+    /// amount, so balanceOf never reports below it even when per-user deposit rounding makes the share-derived
+    /// value lower.
     /// @param account Address of the account.
     /// @return balanceRay Account's Stable Vault balance in RAY.
     function balanceOf(address account) external view returns (uint256 balanceRay);
@@ -228,6 +233,8 @@ interface IStableVault {
 
     /// @notice Getter for the aggregated obligations owed to depositors in RAY of the denominating currency.
     /// @dev Includes the total supply of IOU tokens across all chains (circulating + locked for bridging).
+    /// @dev The active sub-vault portion is floored at the aggregate of all users' original deposits, so the figure
+    /// never understates the principal the protocol guarantees is withdrawable.
     /// @return obligations Aggregated obligations owed to depositors in RAY of the denominating currency.
     function getVaultObligations() external view returns (uint256);
 

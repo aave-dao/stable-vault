@@ -6,7 +6,7 @@ pragma solidity ^0.8.22;
 /// @author Aave Labs
 /// @notice Interface for chain balance oracle functionality required on the Accounting Chain.
 interface IChainBalanceOracle {
-    /// @notice The representation of the response from the oracle adapter.
+    /// @notice The representation of the response from the oracle.
     /// @param balanceRay The aggregated balance on a given chain in ray units.
     /// @param lastUpdateTimestamp The timestamp of the last update published to the destination chain.
     /// @param sourceChainTimestamp The timestamp at which the source Earning Chain data was read.
@@ -22,7 +22,10 @@ interface IChainBalanceOracle {
 
     /// @notice Queries an oracle feed for data representing the aggregate price-adjusted balance of an asset from a
     /// given Earning Chain.
-    /// @param chainId Earning chain id to query data for.
-    /// @return ChainBalance response from the oracle adapter.
+    /// @dev Must revert when the chain ID is not supported by this oracle, so callers can rely on a successful return
+    /// meaning the chain is supported. A supported chain that cannot produce fresh data does not revert here; it
+    /// returns isStale = true.
+    /// @param chainId Earning chain ID to query data for.
+    /// @return ChainBalance response from the oracle.
     function getChainBalance(uint256 chainId) external view returns (ChainBalance memory);
 }
