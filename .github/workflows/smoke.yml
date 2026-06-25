@@ -139,7 +139,9 @@ jobs:
             echo "If this PR intentionally lands config ahead of the deploy, add the \`smoke-config-ahead\` label to mute."
             echo ""
             echo '```'
-            tail -c 60000 smoke-summary.txt || true
+            # Strip ANSI color/style escapes — they render as literal garbage in a markdown
+            # code block (the raw Actions log keeps its colors).
+            sed -E 's/\x1b\[[0-9;]*m//g' smoke-summary.txt | tail -c 60000 || true
             echo '```'
             echo 'SMOKE_EOF'
           } >> "$GITHUB_OUTPUT"
