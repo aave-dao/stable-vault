@@ -126,12 +126,12 @@ function buildAllocatorSpecs(args: BuildArgs): GetterSpec[] {
   if (chain === "earning") {
     // EC: sGHO ERC-4626 strategies declared in JSONC; per-entry trust + per-asset registration.
     const strategies = (chainConfig.erc4626Strategies ?? []) as Array<{
-      address: string;
+      strategyAddress: string;
       underlyingAddress: string;
       strategySymbol: string;
     }>;
     for (const strat of strategies) {
-      const stratAddr = getAddress(strat.address);
+      const stratAddr = getAddress(strat.strategyAddress);
       const underlyingAddr = getAddress(strat.underlyingAddress);
       specs.push({
         group: "Allocator",

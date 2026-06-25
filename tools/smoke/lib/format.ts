@@ -9,6 +9,26 @@ const RAY = 10n ** 27n;
 const BPS = 10_000n;
 const SECONDS_PER_DAY = 86_400n;
 
+const NUMERIC_FORMATS = new Set<ValueFormat>([
+  "bps",
+  "seconds",
+  "ray",
+  "rayPerSec",
+  "assetWei",
+  "assetWeiPerSec",
+  "uint",
+]);
+
+function isNumericString(v: string): boolean {
+  if (v.trim() === "") return false;
+  try {
+    BigInt(v);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const ASSET_META: Record<string, { decimals: number; symbol: string }> = {
   gho: { decimals: 18, symbol: "GHO" },
   usdc: { decimals: 6, symbol: "USDC" },
@@ -18,6 +38,12 @@ const ASSET_META: Record<string, { decimals: number; symbol: string }> = {
 export function humanise(value: unknown, format?: ValueFormat, key?: string): string {
   if (value === undefined || value === null) return "—";
   if (format === undefined || format === "raw") return formatRaw(value);
+  // Some checks pair a numeric `format` with a human-readable descriptor expected value
+  // (e.g. live probes use expected ">0 ray"). Those aren't coercible to BigInt; render the
+  // descriptor verbatim rather than crashing the numeric formatter below.
+  if (typeof value === "string" && NUMERIC_FORMATS.has(format) && !isNumericString(value)) {
+    return value;
+  }
 
   switch (format) {
     case "address":

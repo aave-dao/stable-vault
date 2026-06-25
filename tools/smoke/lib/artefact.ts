@@ -20,15 +20,15 @@ interface RawATokenVault {
 }
 
 /**
- * Resolve the deployment artefact path. Prefers `deployments/<env>/v1/<network>.json`
+ * Resolve the deployment artefact path. Prefers `deployments/<env>/<network>.json`
  * when present (forward-compatible with multi-EC deploys writing per-network
- * artefacts), falling back to `deployments/<env>/v1/<kind>.json` (today's
+ * artefacts), falling back to `deployments/<env>/<kind>.json` (today's
  * single-EC `earning.json` / `accounting.json` layout).
  */
 export function artefactPath(env: Env, kind: ChainKind, network: string, repoRoot: string): string {
-  const networkPath = resolve(repoRoot, `deployments/${env}/v1/${network}.json`);
+  const networkPath = resolve(repoRoot, `deployments/${env}/${network}.json`);
   if (existsSync(networkPath)) return networkPath;
-  return resolve(repoRoot, `deployments/${env}/v1/${kind}.json`);
+  return resolve(repoRoot, `deployments/${env}/${kind}.json`);
 }
 
 export function loadArtefact(env: Env, kind: ChainKind, network: string, repoRoot: string): DeploymentArtefact {
