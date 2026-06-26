@@ -2,7 +2,7 @@
 //
 // For every role:
 //   1. getRoleGrantDelay(roleId) → expected delaySeconds[env]
-//   2. For each profile in grantedTo[]: hasRole(roleId, profileAddress) → (true, 0)
+//   2. For each profile in grantedTo[]: hasRole(roleId, profileAddress) → (true, delaySeconds[env])
 //   3. getTargetFunctionRole(<contract.address>, <selector>) → roleId
 //
 // Plus two structural assertions:
@@ -110,6 +110,20 @@ export function buildAccessSpecs(args: AccessArgs): GetterSpec[] {
         expected: true,
         format: "bool",
         pick: (raw) => (raw as readonly [boolean, number])[0],
+      });
+      // hasRole returns (isMember, executionDelay). Membership alone isn't enough — a grant with
+      // the wrong per-member execution delay would pass. Assert the delay equals the role's tier
+      // (matches the dashboard, which asserts execDelay === role.delaySeconds).
+      specs.push({
+        group: "AccessManager",
+        key: `AccessManager.${role.key}.grants.${profileName}.execDelay`,
+        address: accessManager.address,
+        abi: ACCESS_MANAGER_ABI,
+        functionName: "hasRole",
+        args: [roleId, profileAddr],
+        expected: expectedDelay,
+        format: "seconds",
+        pick: (raw) => BigInt((raw as readonly [boolean, number])[1]),
       });
     }
 
