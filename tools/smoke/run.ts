@@ -263,12 +263,14 @@ async function main(): Promise<number> {
     process.stdout.write(`Report: ${reportPath}\n`);
   }
 
-  if (report.summary.error > 0) return EXIT_CODES.rpcError;
+  // A confirmed parity fail is real drift and must win over a (possibly transient) RPC error —
+  // otherwise one reverting getter masks the drift and mislabels it as "RPC, retry". Check fail first.
   if (report.summary.fail > 0) {
     // Distinguish "predicted address has no code" (incomplete deploy) from generic parity fails.
     const incomplete = results.some((r) => r.key.endsWith(".code") && r.severity === "fail");
     return incomplete ? EXIT_CODES.incompleteDeploy : EXIT_CODES.parityFail;
   }
+  if (report.summary.error > 0) return EXIT_CODES.rpcError;
   return EXIT_CODES.pass;
 }
 
