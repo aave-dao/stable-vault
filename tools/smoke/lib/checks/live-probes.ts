@@ -182,7 +182,11 @@ export async function runLiveProbes(args: LiveProbeArgs): Promise<CheckResult[]>
           const data = raw as readonly [bigint, bigint, bigint, bigint, bigint];
           const answer = data[1];
           const startedAt = data[2];
-          const ageSeconds = ctx.blockTimestamp - startedAt;
+          const ageSeconds = ctx.blockTimestamp > startedAt ? ctx.blockTimestamp - startedAt : 0n;
+          // Matches L2ChainlinkOracleAdapter.GRACE_PERIOD_TIME_SECONDS: the feed is only "healthy"
+          // once the sequencer has been up for >= the grace period. Until then the L2 oracle still
+          // treats prices as stale (validatePrice reverts), so "answer==0" alone isn't enough.
+          const GRACE_PERIOD_SECONDS = 7200n;
           if (answer !== 0n) {
             return {
               group: "LiveProbes",
@@ -194,11 +198,23 @@ export async function runLiveProbes(args: LiveProbeArgs): Promise<CheckResult[]>
               note: "sequencer reports down — withdrawals may revert via L2 oracle staleness",
             };
           }
+          if (ageSeconds < GRACE_PERIOD_SECONDS) {
+            // Transient (clears once the grace period elapses) — warn rather than block the gate.
+            return {
+              group: "LiveProbes",
+              key: "Chainlink.sequencerUptimeFeed.up",
+              severity: "warning",
+              expected: `up + grace elapsed (>=${GRACE_PERIOD_SECONDS}s)`,
+              actual: `up but only ${ageSeconds}s since recovery`,
+              format: "raw",
+              note: "sequencer up but within the grace period — the L2 oracle still treats prices as stale until it elapses",
+            };
+          }
           return {
             group: "LiveProbes",
             key: "Chainlink.sequencerUptimeFeed.up",
             severity: "pass",
-            expected: "answer=0",
+            expected: "answer=0, grace elapsed",
             actual: `answer=0, age=${ageSeconds}s`,
             format: "raw",
           };
