@@ -127,12 +127,16 @@ export function buildAccessSpecs(args: AccessArgs): GetterSpec[] {
       });
     }
 
-    // 3. Target-function-role parity: confirm the contract.selector mapping points at roleId.
-    const targetEntry = tryEntry(artefact, role.contract);
-    if (targetEntry) {
+    // 3. Target-function-role parity: confirm each deployed target's selector maps to roleId.
+    // Iterate role.locations[] (the concrete deployed contract names) rather than role.contract —
+    // the latter is often an abstract base ("ChainGateway", "BridgeAdapter", "RescuableToken") that
+    // is not an artefact key, which silently dropped the wiring check for ~10 roles/chain.
+    for (const loc of role.locations) {
+      const targetEntry = tryEntry(artefact, loc);
+      if (!targetEntry) continue; // location not deployed on this chain
       specs.push({
         group: "AccessManager",
-        key: `AccessManager.${role.key}.target`,
+        key: `AccessManager.${role.key}.target.${loc}`,
         address: accessManager.address,
         abi: ACCESS_MANAGER_ABI,
         functionName: "getTargetFunctionRole",
