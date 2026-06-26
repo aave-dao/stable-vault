@@ -101,6 +101,9 @@ export async function runParity({ client, blockNumber, specs }: RunArgs): Promis
 }
 
 function defaultEquals(expected: unknown, actual: unknown): boolean {
+  // Never treat a missing value as a match: a spec with an undefined expected (catalogue bug) or a
+  // pick() that returns undefined (struct shape changed) must surface as a fail, not silently pass.
+  if (expected === undefined || expected === null || actual === undefined || actual === null) return false;
   if (typeof expected === "bigint" || typeof actual === "bigint") {
     try {
       return toBig(expected) === toBig(actual);
