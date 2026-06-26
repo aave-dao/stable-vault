@@ -6,11 +6,12 @@
 const RATE_LIMIT_BUCKET = {
   name: "",
   type: "tuple",
+  // Mirrors RateLimitBucketLib.Bucket exactly: (uint128 capacity, refillRate, consumed, lastUpdate).
   components: [
     { name: "capacity", type: "uint128" },
     { name: "refillRate", type: "uint128" },
     { name: "consumed", type: "uint128" },
-    { name: "lastRefillTimestamp", type: "uint64" },
+    { name: "lastUpdate", type: "uint128" },
   ],
 } as const;
 
@@ -197,7 +198,7 @@ export const WITHDRAWAL_EXECUTION_POLICY_ABI = [
           { name: "capacity", type: "uint128" },
           { name: "refillRate", type: "uint128" },
           { name: "consumed", type: "uint128" },
-          { name: "lastRefillTimestamp", type: "uint64" },
+          { name: "lastUpdate", type: "uint128" },
         ],
       },
     ],
@@ -334,9 +335,9 @@ export const CHAIN_BALANCE_ORACLE_ABI = [
         type: "tuple",
         components: [
           { name: "balanceRay", type: "uint256" },
-          { name: "lastUpdateTimestamp", type: "uint64" },
-          { name: "sourceChainTimestamp", type: "uint64" },
-          { name: "sourceChainBlockNumber", type: "uint64" },
+          { name: "lastUpdateTimestamp", type: "uint256" },
+          { name: "sourceChainTimestamp", type: "uint256" },
+          { name: "sourceChainBlockNumber", type: "uint256" },
           { name: "isStale", type: "bool" },
         ],
       },
