@@ -38,9 +38,11 @@ export async function runTopology(args: TopologyArgs): Promise<CheckResult[]> {
   const results: CheckResult[] = [];
 
   for (const [name, entry] of artefact.entries) {
-    // Skip implementation entries themselves — they're verified transitively via
-    // the ERC-1967 slot read on the matching proxy.
-    if (name.endsWith("::Implementation")) continue;
+    // NOTE: `<Name>::Implementation` entries are processed here too. The proxy's ERC-1967 slot only
+    // proves the impl ADDRESS, not its code — so the impl's runtime bytecode must be matched on its
+    // own (this is where the upgradeable contracts' logic actually lives). Impl entries have an empty
+    // saltSeed (deployed via the CREATE3 factory's inner CREATE), so CREATE3 re-derivation is skipped
+    // and the artefact address is accepted; they then get the code-presence + bytecode-match checks.
 
     // 1. CREATE3 re-derivation
     if (entry.saltSeed !== "") {
