@@ -3,6 +3,9 @@ src = "src"
 out = "out"
 libs = ["lib"]
 solc_version = "0.8.28"
+# prevents tests breaking on Foundry >= v1.7, which enables dynamic test linking
+# by default (rewrites type(X).creationCode into non-pure vm.getCode() calls)
+dynamic_test_linking = false
 # Per-tx gas limit used by `forge script` simulation. The default is too low for our CreateX-wrapped
 # deploys of contracts close to the EIP-170 24KB cap (the bytecode-deposit cost alone exceeds it).
 gas_limit = "18446744073709551615"
