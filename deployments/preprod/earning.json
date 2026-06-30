@@ -19,13 +19,9 @@
     "address": "0x52ce0f80e1e30999787de2f2b8019d35cae2a31e",
     "saltSeed": "aave.stable-vault.PolicyRegistry"
   },
-  "WithdrawalExecutionPolicy::Implementation": {
-    "address": "0x36d7c2eecd6c1cef55913aaecb37de58443e2063",
-    "saltSeed": ""
-  },
   "WithdrawalExecutionPolicy": {
-    "address": "0x77307ed1a26d1e86433059e443c1256147e2bc62",
-    "saltSeed": "aave.stable-vault.WithdrawalExecutionPolicy"
+    "address": "0xd24051fce1b216fd95c0999cd0b0f64050dc2be3",
+    "saltSeed": "aave.stable-vault.WithdrawalExecutionPolicy.b9461591"
   },
   "IouToken": {
     "address": "0xc85d851746deffd2b04bf995e5a576f95695d386",
@@ -79,10 +75,6 @@
     "address": "0xaA9269672489e9D39fb11d8e9717681c23Da8696",
     "saltSeed": "[This was not deployed with the canonical scripts]"
   },
-  "AdiAdapter__Legacy": {
-    "address": "0x6a71b6f6fc30e6ea2e6a49b2223d9d109e2ba7aa",
-    "saltSeed": "aave.stable-vault.AdiAdapter"
-  },
   "EarningChainStateProvider::Implementation": {
     "address": "0xac7ea45b7e9d226ead1836df476a6251a582b393",
     "saltSeed": ""
@@ -92,8 +84,8 @@
     "saltSeed": "aave.stable-vault.EarningChainStateProvider"
   },
   "FundsBridgingPolicy": {
-    "address": "0xa0251a95da4886543e0c83c87a28722d2def77af",
-    "saltSeed": "aave.stable-vault.FundsBridgingPolicy"
+    "address": "0x9a83c7cc21ecfd412ed52274ae2def238e190a9a",
+    "saltSeed": "aave.stable-vault.FundsBridgingPolicy.b9461591"
   },
   "aTokenVaults": [
     {
