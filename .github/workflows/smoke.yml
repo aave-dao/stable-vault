@@ -35,6 +35,29 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  smoke-unit:
+    name: Smoke Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install JS deps
+        run: yarn install --frozen-lockfile
+
+      - name: Typecheck
+        run: yarn smoke:typecheck
+
+      - name: Unit tests
+        run: yarn smoke:test
+
   smoke-prod:
     name: Smoke (prod drift)
     runs-on: ubuntu-latest
