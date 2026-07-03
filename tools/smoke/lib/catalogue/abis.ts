@@ -1,6 +1,6 @@
 // Hand-curated ABI fragments for every getter smoke calls. Kept small and
 // `as const` so viem can infer return shapes. Full ABIs from `out/` are not
-// imported — we don't need write functions, events, or errors.
+// imported - we don't need write functions, events, or errors.
 
 // Bucket tuple shared by per-asset and global rate-limit getters (RateLimitBucketLib.Bucket).
 const RATE_LIMIT_BUCKET = {

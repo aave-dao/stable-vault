@@ -39,7 +39,7 @@ export async function runTopology(args: TopologyArgs): Promise<CheckResult[]> {
 
   for (const [name, entry] of artefact.entries) {
     // NOTE: `<Name>::Implementation` entries are processed here too. The proxy's ERC-1967 slot only
-    // proves the impl ADDRESS, not its code — so the impl's runtime bytecode must be matched on its
+    // proves the impl ADDRESS, not its code - so the impl's runtime bytecode must be matched on its
     // own (this is where the upgradeable contracts' logic actually lives). Impl entries have an empty
     // saltSeed (deployed via the CREATE3 factory's inner CREATE), so CREATE3 re-derivation is skipped
     // and the artefact address is accepted; they then get the code-presence + bytecode-match checks.
@@ -102,7 +102,7 @@ export async function runTopology(args: TopologyArgs): Promise<CheckResult[]> {
     });
 
     // A "<Name>::Implementation" sibling means this entry is a proxy. Its runtime is OZ proxy
-    // boilerplate, not the contract logic — so we don't byte-match the proxy itself; the logic is
+    // boilerplate, not the contract logic - so we don't byte-match the proxy itself; the logic is
     // verified on the ::Implementation entry (matched below) plus the ERC-1967 slot check.
     const recordedImpl = implEntry(artefact, name);
 
@@ -123,7 +123,7 @@ export async function runTopology(args: TopologyArgs): Promise<CheckResult[]> {
           severity: "fail",
           expected: "matches built artefact",
           actual: "differs",
-          note: `runtime bytecode does not match the build — ${match.note}`,
+          note: `runtime bytecode does not match the build - ${match.note}`,
         });
       } else {
         const note =
@@ -142,7 +142,7 @@ export async function runTopology(args: TopologyArgs): Promise<CheckResult[]> {
       }
     }
 
-    // 4. ERC-1967 impl slot — only for contracts the deployment recorded an implementation for.
+    // 4. ERC-1967 impl slot - only for contracts the deployment recorded an implementation for.
     // Driven by the artefact's "<Name>::Implementation" entry (ground truth) rather than a
     // hardcoded proxy set, so it self-maintains as topology changes (e.g. policies deployed
     // directly rather than behind a proxy won't false-fail with a zero impl slot).

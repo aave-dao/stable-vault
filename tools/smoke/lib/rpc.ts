@@ -4,7 +4,7 @@
 // RPC URLs come from env vars (default convention `SMOKE_RPC_<ENV>_<NETWORK>`,
 // e.g. `SMOKE_RPC_STAGING_ARBITRUM`; per-chain `rpcEnvVar` override in
 // tools/smoke/networks.json) or `--rpc <url>` CLI override. We never log the
-// full URL — only the host portion — so secrets in URLs don't leak into stdout
+// full URL - only the host portion - so secrets in URLs don't leak into stdout
 // or the JSON report.
 
 import { createPublicClient, http, type Address, type PublicClient } from "viem";

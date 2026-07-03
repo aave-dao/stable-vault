@@ -1,4 +1,4 @@
-// tools/smoke/run-env.ts — multi-chain orchestrator.
+// tools/smoke/run-env.ts - multi-chain orchestrator.
 //
 // Runs the smoke harness against every chain configured for an env in
 // tools/smoke/networks.json, in parallel. Subprocess outputs are buffered and

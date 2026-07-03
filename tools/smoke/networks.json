@@ -1,5 +1,5 @@
 {
-  "$comment": "Maps each smoke-test env to the chains it covers. RPC URLs come from SMOKE_RPC_<ENV>_<NETWORK_UPPER> env vars by default (e.g. SMOKE_RPC_STAGING_ARBITRUM); a chain entry can override the env-var name via an optional 'rpcEnvVar' field. 'rpcSource' is documentation only — staging uses Tenderly vnets, preprod/prod use real mainnet RPCs. 'kind' is the chain's role in the system (accounting/earning); 'network' is the human label (arbitrum/ethereum/base/...), used for env-var lookup, banners, report keys, and (forward-compatibly) for the deployment artefact filename. Add more earning chains by appending to the chains array.",
+  "$comment": "Maps each smoke-test env to the chains it covers. RPC URLs come from SMOKE_RPC_<ENV>_<NETWORK_UPPER> env vars by default (e.g. SMOKE_RPC_STAGING_ARBITRUM); a chain entry can override the env-var name via an optional 'rpcEnvVar' field. 'rpcSource' is documentation only - staging uses Tenderly vnets, preprod/prod use real mainnet RPCs. 'kind' is the chain's role in the system (accounting/earning); 'network' is the human label (arbitrum/ethereum/base/...), used for env-var lookup, banners, report keys, and (forward-compatibly) for the deployment artefact filename. Add more earning chains by appending to the chains array.",
   "staging": {
     "rpcSource": "vnet",
     "chains": [

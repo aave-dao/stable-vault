@@ -9,7 +9,7 @@ import { maskRanges, stripCborMetadata, strip0x } from "../lib/bytecode.js";
 
 describe("maskRanges", () => {
   it("zeros exactly the named byte ranges (offsets in bytes)", () => {
-    // bytes: aa bb cc dd ee ff — mask start=1 length=2 -> bytes 1,2
+    // bytes: aa bb cc dd ee ff - mask start=1 length=2 -> bytes 1,2
     assert.equal(maskRanges("aabbccddeeff", { x: [{ start: 1, length: 2 }] }), "aa0000ddeeff");
   });
 

@@ -1,15 +1,14 @@
 // Match a contract's on-chain runtime bytecode against the current Foundry build,
 // tolerating the two differences that are expected even when the source is identical:
-//   1. Immutables — solc writes constructor immutables into the runtime at deploy time,
+//   1. Immutables - solc writes constructor immutables into the runtime at deploy time,
 //      but the artefact's deployedBytecode has those byte ranges as zeros. We mask the
 //      ranges (from the artefact's `immutableReferences`) on both sides before comparing.
-//   2. CBOR metadata — solc appends a trailing metadata hash (compiler version/settings/
+//   2. CBOR metadata - solc appends a trailing metadata hash (compiler version/settings/
 //      source paths). We strip it so a logic-identical build still matches.
 //
 // This assumes the build IS the deployed source (the `master == deployed` invariant): smoke
 // builds at the current checkout, so a genuine source change surfaces as a `mismatch`.
 //
-// Adapted from the stable-vault-dashboard bytecode matcher (immutable-masked / partial tiers).
 // Reads the Foundry artefact under out/<file>.sol/<name>.json; falls back to
 // `forge inspect <name> deployedBytecode --json` (no immutableReferences in that path).
 
@@ -179,7 +178,7 @@ function findArtefactFiles(root: string, name: string): string[] {
         }
       }
     } catch {
-      // out/ missing or unreadable — fall through to forge inspect
+      // out/ missing or unreadable - fall through to forge inspect
     }
   };
   walk(root);
@@ -196,7 +195,7 @@ function readViaForgeInspect(name: string, repoRoot: string): Candidate[] {
     const parsed = JSON.parse(stdout) as { object?: string } | string;
     const obj = typeof parsed === "string" ? parsed : parsed.object;
     if (!obj || obj === "0x") return [];
-    // forge inspect doesn't surface immutableReferences — masking unavailable on this path.
+    // forge inspect doesn't surface immutableReferences - masking unavailable on this path.
     return [{ profile: "inspect", object: obj, refs: {} }];
   } catch {
     return [];

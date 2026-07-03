@@ -1,4 +1,4 @@
-// Live probes — runtime invariants that aren't expressible as "JSONC value
+// Live probes - runtime invariants that aren't expressible as "JSONC value
 // equals on-chain value" but are essential for proving the system can actually
 // operate after deploy. All batched into a single multicall for efficiency.
 
@@ -39,7 +39,7 @@ interface ProbeCall {
 }
 
 export async function runLiveProbes(args: LiveProbeArgs): Promise<CheckResult[]> {
-  const { env, chain, artefact, client, blockNumber, blockTimestamp, config } = args;
+  const { chain, artefact, client, blockNumber, blockTimestamp, config } = args;
   const chainKey = chain === "accounting" ? "accountingChain" : "earningChain";
   const chainConfig = (config[chainKey] ?? {}) as Record<string, unknown>;
   const remoteConfig = (config[chain === "accounting" ? "earningChain" : "accountingChain"] ?? {}) as Record<
@@ -74,7 +74,7 @@ export async function runLiveProbes(args: LiveProbeArgs): Promise<CheckResult[]>
               expected: ">0 ray",
               actual: v,
               format: "ray",
-              note: "oracle returned 0 — adapter stale or unset",
+              note: "oracle returned 0 - adapter stale or unset",
             };
           }
           return {
@@ -195,11 +195,11 @@ export async function runLiveProbes(args: LiveProbeArgs): Promise<CheckResult[]>
               expected: "answer=0 (up)",
               actual: `answer=${answer}, startedAt=${startedAt}`,
               format: "raw",
-              note: "sequencer reports down — withdrawals may revert via L2 oracle staleness",
+              note: "sequencer reports down - withdrawals may revert via L2 oracle staleness",
             };
           }
           if (ageSeconds < GRACE_PERIOD_SECONDS) {
-            // Transient (clears once the grace period elapses) — warn rather than block the gate.
+            // Transient (clears once the grace period elapses) - warn rather than block the gate.
             return {
               group: "LiveProbes",
               key: "Chainlink.sequencerUptimeFeed.up",
@@ -207,7 +207,7 @@ export async function runLiveProbes(args: LiveProbeArgs): Promise<CheckResult[]>
               expected: `up + grace elapsed (>=${GRACE_PERIOD_SECONDS}s)`,
               actual: `up but only ${ageSeconds}s since recovery`,
               format: "raw",
-              note: "sequencer up but within the grace period — the L2 oracle still treats prices as stale until it elapses",
+              note: "sequencer up but within the grace period - the L2 oracle still treats prices as stale until it elapses",
             };
           }
           return {
@@ -245,7 +245,4 @@ export async function runLiveProbes(args: LiveProbeArgs): Promise<CheckResult[]>
     }
     return probe.verify(r.result, { blockTimestamp });
   });
-
-  // Reference unused params to keep typecheck quiet for future flags.
-  void env;
 }

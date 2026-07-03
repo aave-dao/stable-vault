@@ -6,7 +6,7 @@
 // Run via `yarn smoke:audit-deps`. Fails CI on violation.
 //
 // Scope: only deps owned by the smoke harness. The rest of the repo's deps
-// are out of scope here — they're audited via dependabot + `yarn audit`.
+// are out of scope here - they're audited via dependabot + `yarn audit`.
 
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -39,7 +39,7 @@ async function main(): Promise<void> {
       violations.push(`${name}: declared in SMOKE_DIRECT_DEPS but missing from package.json`);
       continue;
     }
-    // Reject caret / tilde / wildcard ranges outright — they defeat the lockfile
+    // Reject caret / tilde / wildcard ranges outright - they defeat the lockfile
     // guarantee that this script audits the actually-installed version.
     if (!/^\d+\.\d+\.\d+(-[A-Za-z0-9.-]+)?$/.test(range)) {
       violations.push(`${name}@${range}: must be pinned to an exact version (no ^, ~, or wildcards)`);

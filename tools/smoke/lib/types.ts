@@ -1,6 +1,5 @@
-// Shared types for the smoke harness. Re-exports Env from
-// .github/workflows/tooling/roles-sync to keep the source-of-truth for env
-// identifiers in one place.
+// Shared types for the smoke harness: env / chain identifiers, the parsed
+// deployment artefact, per-check results, and the aggregate report shape.
 
 import type { Address, Hex } from "viem";
 
@@ -10,7 +9,7 @@ export const ENVS: readonly Env[] = ["staging", "preprod", "prod"] as const;
 export type ChainKind = "accounting" | "earning";
 export const CHAIN_KINDS: readonly ChainKind[] = ["accounting", "earning"] as const;
 
-/** A single contract entry in `deployments/<env>/v1/<chain>.json`. */
+/** A single contract entry in `deployments/<env>/<chain>.json`. */
 export interface ArtefactEntry {
   address: Address;
   saltSeed: string;

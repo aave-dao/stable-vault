@@ -9,7 +9,6 @@ import { type Abi, type Address, getAddress, keccak256, toBytes } from "viem";
 import { tryEntry } from "../artefact.js";
 import { buildAccessSpecs } from "./access-from-roles.js";
 import {
-  ACCESS_MANAGER_ABI,
   ALLOCATOR_ABI,
   ASSET_REGISTRY_ABI,
   BASE_CHAIN_GATEWAY_ABI,
@@ -27,8 +26,6 @@ import {
 } from "./abis.js";
 import type { GetterSpec } from "../parity.js";
 import type { ChainKind, DeploymentArtefact, Env } from "../types.js";
-
-void ACCESS_MANAGER_ABI; // re-exported transitively via access-from-roles
 
 type ChainConfig = Record<string, unknown>;
 
@@ -163,7 +160,7 @@ function buildAllocatorSpecs(args: BuildArgs): GetterSpec[] {
   }
 
   // aTokenVault strategies (both chains use them). Sourced from the deployment
-  // artefact's aTokenVaults[] array — one entry per (assetSymbol, address).
+  // artefact's aTokenVaults[] array - one entry per (assetSymbol, address).
   for (const vault of artefact.aTokenVaults) {
     const stratAddr = vault.address;
     const assetKey = vault.assetSymbol.toLowerCase() as Asset | string;
@@ -206,7 +203,7 @@ function buildStableVaultSpecs(args: BuildArgs): GetterSpec[] {
 
   // Treasury is set post-deploy and the JSONC may not carry it. Only assert parity when config
   // declares a `treasury`; otherwise skip (a hard-coded 0x0 expectation goes stale the moment
-  // treasury is set, silently passing). See VA-229 audit.
+  // treasury is set, silently passing).
   const treasury = ac.treasury as string | undefined;
   if (treasury !== undefined && treasury !== "TBD") {
     specs.push({
@@ -243,10 +240,9 @@ function buildStableVaultSpecs(args: BuildArgs): GetterSpec[] {
     });
   }
   if (ac.defaultSubVaultPerSecondRate !== undefined) {
-    // Real parity check: StableVault.initialize() sets the default sub-vault to
-    // `defaultSubVaultPerSecondRate` (via _setDefaultSubVault(_getOrCreateSubVaultWithRate(rate), rate)),
-    // so getDefaultSubVault().perSecondRate must equal the config rate. (The dashboard demotes this
-    // to INFO calling it a "different concept" — that's wrong; it correctly catches default-rate drift.)
+    // StableVault.initialize() sets the default sub-vault to `defaultSubVaultPerSecondRate`
+    // (via _setDefaultSubVault(_getOrCreateSubVaultWithRate(rate), rate)), so
+    // getDefaultSubVault().perSecondRate must equal the config rate.
     specs.push({
       group: "StableVault",
       key: "StableVault.defaultSubVault.perSecondRate",
@@ -283,7 +279,7 @@ function buildStableVaultSpecs(args: BuildArgs): GetterSpec[] {
   return specs;
 }
 
-// ---------- IouToken (accounting chain only — canonical IOU token) ----------
+// ---------- IouToken (accounting chain only - canonical IOU token) ----------
 
 function buildIouTokenSpecs(args: BuildArgs): GetterSpec[] {
   const { config, artefact, chain } = args;
@@ -413,7 +409,7 @@ function buildDepositPolicySpecs(args: BuildArgs): GetterSpec[] {
   const depositPolicyConfig = (ac.depositPolicy ?? {}) as ChainConfig;
   const specs: GetterSpec[] = [];
 
-  // Global (cross-asset, normalized) deposit cap — GlobalRateLimitedPolicy.
+  // Global (cross-asset, normalized) deposit cap - GlobalRateLimitedPolicy.
   const globalLimit = depositPolicyConfig.globalLimit as
     | { capacity: string | number; refillRate: string | number }
     | undefined;
@@ -492,7 +488,7 @@ function buildFundsBridgingPolicySpecs(args: BuildArgs): GetterSpec[] {
   const fbpConfig = (chainConfig.fundsBridgingPolicy ?? {}) as ChainConfig;
   const specs: GetterSpec[] = [];
 
-  // Global (cross-asset, normalized) bridging cap — GlobalRateLimitedPolicy.
+  // Global (cross-asset, normalized) bridging cap - GlobalRateLimitedPolicy.
   const globalLimit = fbpConfig.globalLimit as
     | { capacity: string | number; refillRate: string | number }
     | undefined;
@@ -709,9 +705,8 @@ function buildOracleWiringSpecs(args: BuildArgs): GetterSpec[] {
 
 function buildBridgeAdapterSpecs(args: BuildArgs): GetterSpec[] {
   const { artefact, config, chain } = args;
-  const gateway = chain === "accounting"
-    ? tryEntry(artefact, "AccountingChainGateway")
-    : tryEntry(artefact, "EarningChainGateway");
+  const gatewayLabel = chain === "accounting" ? "AccountingChainGateway" : "EarningChainGateway";
+  const gateway = tryEntry(artefact, gatewayLabel);
   if (!gateway) return [];
   const chainConfig = (config[chainKey(chain)] ?? {}) as ChainConfig;
   const remoteConfig = (config[chainKey(otherChain(chain))] ?? {}) as ChainConfig;
@@ -725,7 +720,7 @@ function buildBridgeAdapterSpecs(args: BuildArgs): GetterSpec[] {
   const specs: GetterSpec[] = [];
   // Only CcipAdapter moves funds; it is the sole funds bridge adapter. AdiAdapter is a *data-only*
   // adapter (verified below via getDataOnlyBridgeAdapterMode) and is intentionally NOT registered
-  // as a funds bridge adapter — so it must not be asserted into the funds whitelist here.
+  // as a funds bridge adapter - so it must not be asserted into the funds whitelist here.
   const adapters: Array<{ name: string; addr: Address; conditional: boolean; reason?: string }> = [];
   if (ccipAdapter) adapters.push({ name: "CcipAdapter", addr: ccipAdapter.address, conditional: false });
 
@@ -733,10 +728,9 @@ function buildBridgeAdapterSpecs(args: BuildArgs): GetterSpec[] {
     for (const asset of ASSETS) {
       const assetAddr = assets[asset];
       if (!assetAddr) continue;
-      const key = `${gateway === tryEntry(artefact, "AccountingChainGateway") ? "AccountingChainGateway" : "EarningChainGateway"}.${adapter.name}.${asset}`;
       specs.push({
         group: "BridgeAdapters",
-        key,
+        key: `${gatewayLabel}.${adapter.name}.${asset}`,
         address: gateway.address,
         abi: BASE_CHAIN_GATEWAY_ABI,
         functionName: "isFundsBridgeAdapterSupported",
@@ -757,8 +751,6 @@ function buildBridgeAdapterSpecs(args: BuildArgs): GetterSpec[] {
   if (adiAdapter && adiConfig.registerOnGateway) {
     dataOnlyAdapters.push({ name: "AdiAdapter", addr: adiAdapter.address });
   }
-  const gatewayLabel =
-    gateway === tryEntry(artefact, "AccountingChainGateway") ? "AccountingChainGateway" : "EarningChainGateway";
   for (const adapter of dataOnlyAdapters) {
     specs.push({
       group: "BridgeAdapters",

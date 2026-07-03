@@ -4,7 +4,7 @@ name: Smoke
 # config + roles.json that this branch would produce. Catches config<->chain drift on PRs that
 # touch economic config or roles.
 #
-# Gate policy (VA-229): BLOCKING on real drift. A confirmed parity fail / incomplete deploy
+# Gate policy: BLOCKING on real drift. A confirmed parity fail / incomplete deploy
 # (exit 1/2/4) fails the check and blocks the PR; a transient RPC error (exit 3) only warns. The
 # sticky PR comment always posts first, so a blocked PR still shows exactly what diverged.
 #
@@ -118,7 +118,7 @@ jobs:
           SMOKE_RPC_PROD_ARBITRUM: https://arb-mainnet.g.alchemy.com/v2/${{ env.ALCHEMY_KEY }}
         run: |
           # Invoke tsx directly (not via `yarn smoke:prod`) so the comment isn't polluted by the
-          # yarn wrapper banner or tsx's "--env-file-if-exists .env not found" notice — CI uses the
+          # yarn wrapper banner or tsx's "--env-file-if-exists .env not found" notice - CI uses the
           # real SMOKE_RPC_* env vars below, not a .env file. node_modules/.bin must be on PATH so
           # run-env's child `spawn("tsx", …)` resolves (yarn would otherwise add it).
           export PATH="$PWD/node_modules/.bin:$PATH"
@@ -133,18 +133,18 @@ jobs:
         run: |
           case "${{ steps.smoke.outputs.exit_code }}" in
             0) status="✅ no drift" ;;
-            3) status="⚠️ RPC error (transient — re-run; not blocking)" ;;
+            3) status="⚠️ RPC error (transient - re-run; not blocking)" ;;
             *) status="❌ drift / incomplete deploy (blocking)" ;;
           esac
           {
             echo 'body<<SMOKE_EOF'
-            echo "### Smoke (prod drift) — $status"
+            echo "### Smoke (prod drift) - $status"
             echo ""
             echo "Live prod on-chain state vs this branch's config/roles."
             echo "If this PR intentionally lands config ahead of the deploy, add the \`smoke-config-ahead\` label to skip this gate."
             echo ""
             echo '```'
-            # Strip ANSI color/style escapes — they render as literal garbage in a markdown
+            # Strip ANSI color/style escapes - they render as literal garbage in a markdown
             # code block (the raw Actions log keeps its colors).
             sed -E 's/\x1b\[[0-9;]*m//g' smoke-summary.txt | tail -c 60000 || true
             echo '```'
@@ -167,7 +167,7 @@ jobs:
         run: |
           code="${{ steps.smoke.outputs.exit_code }}"
           case "$code" in
-            0) echo "Smoke passed — no drift." ;;
-            3) echo "::warning::Smoke hit an RPC error (exit 3) — transient, not blocking. Re-run if it persists." ;;
-            *) echo "::error::Smoke detected drift / incomplete deploy (exit ${code:-unknown}) — blocking the PR."; exit 1 ;;
+            0) echo "Smoke passed - no drift." ;;
+            3) echo "::warning::Smoke hit an RPC error (exit 3) - transient, not blocking. Re-run if it persists." ;;
+            *) echo "::error::Smoke detected drift / incomplete deploy (exit ${code:-unknown}) - blocking the PR."; exit 1 ;;
           esac

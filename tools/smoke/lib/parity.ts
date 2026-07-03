@@ -3,7 +3,7 @@
 // compares them, and emits a CheckResult per leaf.
 //
 // Adding a new parameter to config/deployment-config.<env>.jsonc requires only
-// adding one entry to lib/catalogue/getters.ts — no engine changes.
+// adding one entry to lib/catalogue/getters.ts - no engine changes.
 
 import type { Abi, Address, PublicClient } from "viem";
 

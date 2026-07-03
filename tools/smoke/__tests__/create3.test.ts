@@ -1,10 +1,9 @@
 // Golden vector + structural tests for the CREATE3 derivation.
 //
-// The single golden vector is TransferHelper from
-// deployments/preprod/accounting.json. Other artefact entries cannot be used
-// as golden vectors because the artefact is updated key-by-key by the deploy
-// script — older entries can lag behind a deployer change (this is precisely
-// the "artefact stale" failure mode the smoke harness is designed to catch).
+// The golden vector is pinned against the Solidity reference output rather than
+// a deployment artefact address: the artefact is updated key-by-key by the deploy
+// script, so a stale entry there is exactly the failure mode the harness catches,
+// and would make a poor fixture.
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -16,9 +15,7 @@ const PREPROD_DEPLOYER = getAddress("0xdca997Dc3a41df1D51F5BBe2091064cdD796e359"
 
 describe("computeCreate3Address", () => {
   // Golden vector cross-checked against the Solidity reference implementation
-  // (script/libraries/Create3AddressLib.sol). When the preprod deployer config
-  // changed, the deployment artefact carried stale entries from the prior deploy;
-  // this vector pins the TS port against the canonical Solidity output instead.
+  // (script/libraries/Create3AddressLib.sol) for the preprod deployer.
   it("matches the Solidity reference for TransferHelper", () => {
     assert.equal(
       computeCreate3Address("aave.stable-vault.TransferHelper", PREPROD_DEPLOYER),

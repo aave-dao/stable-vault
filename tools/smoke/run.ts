@@ -1,6 +1,6 @@
-// tools/smoke/run.ts — smoke harness CLI entrypoint.
+// tools/smoke/run.ts - smoke harness CLI entrypoint.
 //
-// Reads JSONC config + deployment artefact, runs topology + parity + (TODO) live
+// Reads JSONC config + deployment artefact, runs topology + parity + live
 // probes against a live or forked RPC, prints a terminal report in the user's
 // chosen mode, and writes a dated JSON report under tools/smoke/output/.
 //
@@ -263,7 +263,7 @@ async function main(): Promise<number> {
     process.stdout.write(`Report: ${reportPath}\n`);
   }
 
-  // A confirmed parity fail is real drift and must win over a (possibly transient) RPC error —
+  // A confirmed parity fail is real drift and must win over a (possibly transient) RPC error:
   // otherwise one reverting getter masks the drift and mislabels it as "RPC, retry". Check fail first.
   if (report.summary.fail > 0) {
     // Distinguish "predicted address has no code" (incomplete deploy) from generic parity fails.

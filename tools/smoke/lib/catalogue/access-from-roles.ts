@@ -46,7 +46,7 @@ export interface AccessArgs {
 }
 
 export function buildAccessSpecs(args: AccessArgs): GetterSpec[] {
-  const { env, chain, artefact, deployer, repoRoot, config } = args;
+  const { env, artefact, deployer, repoRoot } = args;
   const accessManager = tryEntry(artefact, "AccessManager");
   if (!accessManager) return [];
 
@@ -85,7 +85,7 @@ export function buildAccessSpecs(args: AccessArgs): GetterSpec[] {
     for (const profileName of role.grantedTo) {
       const profileAddrStr = profiles.get(profileName);
       if (!profileAddrStr || profileAddrStr === "0x0000000000000000000000000000000000000000") {
-        // Profile is a TBD placeholder — flag as skipped so it surfaces in output.
+        // Profile is a TBD placeholder - flag as skipped so it surfaces in output.
         specs.push({
           group: "AccessManager",
           key: `AccessManager.${role.key}.grants.${profileName}`,
@@ -111,9 +111,8 @@ export function buildAccessSpecs(args: AccessArgs): GetterSpec[] {
         format: "bool",
         pick: (raw) => (raw as readonly [boolean, number])[0],
       });
-      // hasRole returns (isMember, executionDelay). Membership alone isn't enough — a grant with
-      // the wrong per-member execution delay would pass. Assert the delay equals the role's tier
-      // (matches the dashboard, which asserts execDelay === role.delaySeconds).
+      // hasRole returns (isMember, executionDelay). Membership alone isn't enough: a grant with
+      // the wrong per-member execution delay would pass. Assert the delay equals the role's tier.
       specs.push({
         group: "AccessManager",
         key: `AccessManager.${role.key}.grants.${profileName}.execDelay`,
@@ -128,9 +127,9 @@ export function buildAccessSpecs(args: AccessArgs): GetterSpec[] {
     }
 
     // 3. Target-function-role parity: confirm each deployed target's selector maps to roleId.
-    // Iterate role.locations[] (the concrete deployed contract names) rather than role.contract —
+    // Iterate role.locations[] (the concrete deployed contract names) rather than role.contract:
     // the latter is often an abstract base ("ChainGateway", "BridgeAdapter", "RescuableToken") that
-    // is not an artefact key, which silently dropped the wiring check for ~10 roles/chain.
+    // is not an artefact key, so keying off it would miss the wiring check entirely.
     for (const loc of role.locations) {
       const targetEntry = tryEntry(artefact, loc);
       if (!targetEntry) continue; // location not deployed on this chain
@@ -175,11 +174,6 @@ export function buildAccessSpecs(args: AccessArgs): GetterSpec[] {
       pick: (raw) => (raw as readonly [boolean, number])[0],
     });
   }
-
-  // Reference unused params to keep typecheck quiet (chain/config kept on the
-  // interface because future cross-chain delays may want them).
-  void chain;
-  void config;
 
   return specs;
 }

@@ -1,5 +1,5 @@
 // Chain definitions for the smoke harness. We support Arbitrum + Ethereum L1
-// (and their sepolia testnets) per the Primer's accounting/earning split.
+// (and their sepolia testnets), covering both the accounting and earning chains.
 
 import { arbitrum, arbitrumSepolia, mainnet, sepolia, type Chain } from "viem/chains";
 

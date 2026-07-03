@@ -1,6 +1,6 @@
-# tools/smoke — deployment smoke tests
+# tools/smoke - deployment smoke tests
 
-A read-only sanity check that runs against a live RPC after a deploy. It compares every deployed contract — addresses, bytecode, configuration, role wiring, oracle health — against the source of truth in this repo (`config/deployment-config.<env>.jsonc`, `deployments/<env>/v1/<chain>.json`, and the role catalogue).
+A read-only sanity check that runs against a live RPC after a deploy. It compares every deployed contract - addresses, bytecode, configuration, role wiring, oracle health - against the source of truth in this repo (`config/deployment-config.<env>.jsonc`, `deployments/<env>/<chain>.json`, and the role catalogue).
 
 If anything drifted from what we shipped, it tells you exactly which value is wrong, on which contract, on which chain.
 
@@ -28,9 +28,9 @@ yarn smoke:preprod      # runs accounting + earning + ... (mainnet RPCs)
 yarn smoke:prod         # runs accounting + earning + ... (mainnet RPCs)
 ```
 
-The list of chains per env lives in [`networks.json`](./networks.json) — adding a new earning chain is one entry there plus one env var.
+The list of chains per env lives in [`networks.json`](./networks.json) - adding a new earning chain is one entry there plus one env var.
 
-RPC URLs are read from environment variables, one per `(env, network)` pair. The convention is `SMOKE_RPC_<ENV>_<NETWORK_UPPER>` — the network label comes from `networks.json`:
+RPC URLs are read from environment variables, one per `(env, network)` pair. The convention is `SMOKE_RPC_<ENV>_<NETWORK_UPPER>` - the network label comes from `networks.json`:
 
 ```sh
 SMOKE_RPC_STAGING_ARBITRUM=<arb-vnet-rpc>
@@ -76,14 +76,14 @@ By default you get a per-check table with the expected value and the on-chain va
 | Flag | When to use |
 |---|---|
 | (default) | First time looking at a deployment, or when you want full evidence. |
-| `--summary` | `▸ <group>  X/Y  ✓` — one line per group. Good for CI logs. |
+| `--summary` | `▸ <group>  X/Y  ✓` - one line per group. Good for CI logs. |
 | `--quiet` | Failures only. Good when running a known-good environment regularly. |
 | `--json` | Machine-readable; the same report is also written to `tools/smoke/output/`. |
 
 Other useful flags:
 
-- `--strict` — turn warnings (e.g. `"TBD"` placeholders left in config) into failures. Use for prod.
-- `--no-live-probes` — skip the oracle / CCIP live calls. Faster, less complete; use when the RPC is rate-limited or you only care about static state.
+- `--strict` - turn warnings (e.g. `"TBD"` placeholders left in config) into failures. Use for prod.
+- `--no-live-probes` - skip the oracle / CCIP live calls. Faster, less complete; use when the RPC is rate-limited or you only care about static state.
 
 ## Exit codes
 
@@ -91,13 +91,13 @@ Other useful flags:
 |---|---|
 | `0` | All checks passed. |
 | `1` | One or more checks failed (parity, topology, live probe). Read the table to find which. |
-| `2` | Incomplete deploy — a predicted CREATE3 address has no code. Finish the deploy and retry. |
-| `3` | RPC problem — bad URL, `429`, or chain-id mismatch. |
-| `4` | Config / CLI problem — bad flags, missing RPC, missing deployment artefact. |
+| `2` | Incomplete deploy - a predicted CREATE3 address has no code. Finish the deploy and retry. |
+| `3` | RPC problem - bad URL, `429`, or chain-id mismatch. |
+| `4` | Config / CLI problem - bad flags, missing RPC, missing deployment artefact. |
 
 ## How it works (one paragraph)
 
-The harness loads `config/deployment-config.<env>.jsonc` (the source of truth for configurable parameters) and `deployments/<env>/v1/<chain>.json` (the source of truth for which contracts were deployed and at what address). It then:
+The harness loads `config/deployment-config.<env>.jsonc` (the source of truth for configurable parameters) and `deployments/<env>/<chain>.json` (the source of truth for which contracts were deployed and at what address). It then:
 
 1. **Re-derives every CREATE3 address** from the deployer + salt and asserts the on-chain `code.length > 0` matches.
 2. **Hashes the deployed bytecode** and compares against `forge inspect <contract> deployedBytecode`. This is what verifies the `internal immutable` wiring (e.g. `StableVault.ASSET_REGISTRY`) transitively, without needing a public getter.
@@ -105,7 +105,7 @@ The harness loads `config/deployment-config.<env>.jsonc` (the source of truth fo
 4. **Runs the AccessManager catalogue** driven by the canonical roles JSON (`.github/workflows/tooling/roles-sync/output/roles.json`). For every role: correct delay per env, correct profiles granted, correct selector wired to the right role on the right contract.
 5. **Runs a few live probes** that don't fit the static catalogue: price oracle returns > 0, chain-balance oracle returns `isStale == false`, CCIP router supports the counterparty selector, L2 sequencer feed is up.
 
-If a contract listed in the catalogue isn't in the deployment artefact (e.g. it hasn't been deployed yet on this chain), its checks are skipped — not failed.
+If a contract listed in the catalogue isn't in the deployment artefact (e.g. it hasn't been deployed yet on this chain), its checks are skipped - not failed.
 
 ## Adding a new check
 
@@ -132,7 +132,7 @@ The harness pins exact versions (no `^` or `~`) and refuses to install any direc
 yarn smoke:audit-deps
 ```
 
-The 7-day floor is the simplest defence against freshly-compromised npm packages — most malicious releases are detected and yanked within hours. The audit script enforces it for the harness's direct dependencies (`SMOKE_DIRECT_DEPS` in `tools/smoke/scripts/check-deps-age.ts`); transitive deps are governed by the lockfile and `resolutions` / `overrides` in `package.json`.
+The 7-day floor is the simplest defence against freshly-compromised npm packages - most malicious releases are detected and yanked within hours. The audit script enforces it for the harness's direct dependencies (`SMOKE_DIRECT_DEPS` in `tools/smoke/scripts/check-deps-age.ts`); transitive deps are governed by the lockfile and `resolutions` / `overrides` in `package.json`.
 
 ## File map
 
@@ -150,7 +150,7 @@ tools/smoke/
 │   │   └── abis.ts         hand-curated ABI fragments for the getters we call
 │   ├── parity.ts           generic engine: getter ↔ JSONC leaf via viem multicall
 │   ├── create3.ts          port of script/libraries/Create3AddressLib.sol
-│   ├── artefact.ts         load + index deployments/<env>/v1/<chain>.json
+│   ├── artefact.ts         load + index deployments/<env>/<chain>.json
 │   ├── bytecode.ts         forge inspect / out/ walker for deployed bytecode hashes
 │   ├── format.ts           humanise RAY → $, seconds → readable, bps → %, etc.
 │   ├── render.ts           full / summary / quiet / json renderers
