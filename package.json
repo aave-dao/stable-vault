@@ -2,16 +2,25 @@
   "devDependencies": {
     "@notionhq/client": "^4.0.2",
     "@types/node": "^22.10.5",
+    "cli-table3": "0.6.5",
     "husky": "^9.1.7",
-    "jsonc-parser": "^3.3.1",
-    "tsx": "^4.19.2",
-    "typescript": "^5.7.3"
+    "jsonc-parser": "3.3.1",
+    "picocolors": "1.1.1",
+    "tsx": "4.22.3",
+    "typescript": "^5.7.3",
+    "viem": "2.49.3"
   },
   "lint-staged": {
     "**/*.sol": "forge fmt"
   },
   "dependencies": {
     "lint-staged": "^16.2.4"
+  },
+  "resolutions": {
+    "ws": "8.21.0"
+  },
+  "overrides": {
+    "ws": "8.21.0"
   },
   "scripts": {
     "prepare": "husky || true",
@@ -22,6 +31,20 @@
     "roles:dump": "mkdir -p .github/workflows/tooling/roles-sync/output && TARGET_ENV=staging forge script .github/workflows/tooling/roles-sync/DumpRoles.s.sol && TARGET_ENV=preprod forge script .github/workflows/tooling/roles-sync/DumpRoles.s.sol && TARGET_ENV=prod forge script .github/workflows/tooling/roles-sync/DumpRoles.s.sol",
     "roles:build": "tsx .github/workflows/tooling/roles-sync/build-roles-json.ts",
     "roles:validate": "tsx .github/workflows/tooling/roles-sync/validate-roles-json.ts",
-    "roles:notion-sync": "tsx --env-file-if-exists=.env .github/workflows/tooling/roles-sync/notion-sync.ts"
+    "roles:all": "yarn roles:dump && yarn roles:build && yarn roles:validate",
+    "roles:notion-sync": "tsx --env-file-if-exists=.env .github/workflows/tooling/roles-sync/notion-sync.ts",
+    "smoke:run": "tsx --env-file-if-exists=.env tools/smoke/run.ts",
+    "smoke:staging": "tsx --env-file-if-exists=.env tools/smoke/run-env.ts --env staging",
+    "smoke:preprod": "tsx --env-file-if-exists=.env tools/smoke/run-env.ts --env preprod",
+    "smoke:prod": "tsx --env-file-if-exists=.env tools/smoke/run-env.ts --env prod",
+    "smoke:preprod:accounting": "tsx --env-file-if-exists=.env tools/smoke/run.ts --env preprod --chain accounting",
+    "smoke:preprod:earning": "tsx --env-file-if-exists=.env tools/smoke/run.ts --env preprod --chain earning",
+    "smoke:staging:accounting": "tsx --env-file-if-exists=.env tools/smoke/run.ts --env staging --chain accounting",
+    "smoke:staging:earning": "tsx --env-file-if-exists=.env tools/smoke/run.ts --env staging --chain earning",
+    "smoke:prod:accounting": "tsx --env-file-if-exists=.env tools/smoke/run.ts --env prod --chain accounting",
+    "smoke:prod:earning": "tsx --env-file-if-exists=.env tools/smoke/run.ts --env prod --chain earning",
+    "smoke:test": "tsx --test tools/smoke/__tests__/*.test.ts",
+    "smoke:typecheck": "tsc --noEmit -p tools/smoke/tsconfig.json",
+    "smoke:audit-deps": "tsx tools/smoke/scripts/check-deps-age.ts"
   }
 }

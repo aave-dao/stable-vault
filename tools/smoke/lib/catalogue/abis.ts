@@ -1,0 +1,511 @@
+// Hand-curated ABI fragments for every getter smoke calls. Kept small and
+// `as const` so viem can infer return shapes. Full ABIs from `out/` are not
+// imported - we don't need write functions, events, or errors.
+
+// Bucket tuple shared by per-asset and global rate-limit getters (RateLimitBucketLib.Bucket).
+const RATE_LIMIT_BUCKET = {
+  name: "",
+  type: "tuple",
+  // Mirrors RateLimitBucketLib.Bucket exactly: (uint128 capacity, refillRate, consumed, lastUpdate).
+  components: [
+    { name: "capacity", type: "uint128" },
+    { name: "refillRate", type: "uint128" },
+    { name: "consumed", type: "uint128" },
+    { name: "lastUpdate", type: "uint128" },
+  ],
+} as const;
+
+export const DEPOSIT_POLICY_ABI = [
+  {
+    type: "function",
+    name: "getDepositLimit",
+    stateMutability: "view",
+    inputs: [{ name: "asset", type: "address" }],
+    outputs: [RATE_LIMIT_BUCKET],
+  },
+  {
+    // GlobalRateLimitedPolicy: the cross-asset normalized global cap.
+    type: "function",
+    name: "getGlobalDepositLimit",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [RATE_LIMIT_BUCKET],
+  },
+] as const;
+
+export const FUNDS_BRIDGING_POLICY_ABI = [
+  {
+    type: "function",
+    name: "getBridgingLimit",
+    stateMutability: "view",
+    inputs: [
+      { name: "asset", type: "address" },
+      { name: "destChainId", type: "uint256" },
+      { name: "bridgeAdapter", type: "address" },
+    ],
+    outputs: [RATE_LIMIT_BUCKET],
+  },
+  {
+    // GlobalRateLimitedPolicy: the cross-asset normalized global cap.
+    type: "function",
+    name: "getGlobalBridgingLimit",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [RATE_LIMIT_BUCKET],
+  },
+] as const;
+
+export const SLIPPAGE_COVERAGE_VAULT_ABI = [
+  {
+    type: "function",
+    name: "getMaxSlippageBps",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "getOverrideMaxSlippageBps",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "getOverrideMode",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "bool" }],
+  },
+  {
+    type: "function",
+    name: "getPullCapPerTx",
+    stateMutability: "view",
+    inputs: [{ name: "asset", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    // Must match SlippageCoverageVault.Window field order/types exactly, or the picked field
+    // reads the wrong word (a reversed layout made `.cap` read `windowStart` == 0).
+    type: "function",
+    name: "getWindow",
+    stateMutability: "view",
+    inputs: [{ name: "asset", type: "address" }],
+    outputs: [
+      {
+        name: "",
+        type: "tuple",
+        components: [
+          { name: "windowStart", type: "uint64" },
+          { name: "windowSeconds", type: "uint64" },
+          { name: "consumed", type: "uint128" },
+          { name: "cap", type: "uint128" },
+        ],
+      },
+    ],
+  },
+] as const;
+
+export const STABLE_VAULT_ABI = [
+  {
+    type: "function",
+    name: "getTreasury",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+  },
+  {
+    type: "function",
+    name: "getDefaultSubVault",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [
+      {
+        name: "",
+        type: "tuple",
+        components: [
+          { name: "perSecondRate", type: "uint256" },
+          { name: "id", type: "uint256" },
+        ],
+      },
+    ],
+  },
+  {
+    type: "function",
+    name: "getMaxValidPerSecondRate",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "name",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "string" }],
+  },
+  {
+    type: "function",
+    name: "symbol",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "string" }],
+  },
+] as const;
+
+export const IOU_TOKEN_ABI = [
+  {
+    type: "function",
+    name: "name",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "string" }],
+  },
+  {
+    type: "function",
+    name: "symbol",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "string" }],
+  },
+] as const;
+
+export const WITHDRAWAL_EXECUTION_POLICY_ABI = [
+  {
+    type: "function",
+    name: "getDefaultFeeBps",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "isSigner",
+    stateMutability: "view",
+    inputs: [{ name: "account", type: "address" }],
+    outputs: [{ name: "", type: "bool" }],
+  },
+  {
+    type: "function",
+    name: "getRedemptionBucket",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [
+      {
+        name: "",
+        type: "tuple",
+        components: [
+          { name: "capacity", type: "uint128" },
+          { name: "refillRate", type: "uint128" },
+          { name: "consumed", type: "uint128" },
+          { name: "lastUpdate", type: "uint128" },
+        ],
+      },
+    ],
+  },
+  {
+    type: "function",
+    name: "getMinRedemptionCapacity",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "getMinRedemptionRefillRate",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+] as const;
+
+export const ASSET_REGISTRY_ABI = [
+  {
+    type: "function",
+    name: "isAssetRegistered",
+    stateMutability: "view",
+    inputs: [{ name: "asset", type: "address" }],
+    outputs: [{ name: "", type: "bool" }],
+  },
+  {
+    type: "function",
+    name: "isAssetTrusted",
+    stateMutability: "view",
+    inputs: [{ name: "asset", type: "address" }],
+    outputs: [{ name: "", type: "bool" }],
+  },
+  {
+    type: "function",
+    name: "getAssetConfig",
+    stateMutability: "view",
+    inputs: [{ name: "asset", type: "address" }],
+    outputs: [
+      {
+        name: "",
+        type: "tuple",
+        components: [
+          { name: "depositFromUserAllowed", type: "bool" },
+          { name: "depositIntoAllocatorAllowed", type: "bool" },
+          { name: "swapInputTokenAllowed", type: "bool" },
+          { name: "swapOutputTokenAllowed", type: "bool" },
+        ],
+      },
+    ],
+  },
+] as const;
+
+export const ALLOCATOR_ABI = [
+  {
+    type: "function",
+    name: "getStrategiesForAsset",
+    stateMutability: "view",
+    inputs: [{ name: "asset", type: "address" }],
+    outputs: [{ name: "", type: "address[]" }],
+  },
+  {
+    type: "function",
+    name: "isStrategySupportedForAsset",
+    stateMutability: "view",
+    inputs: [
+      { name: "asset", type: "address" },
+      { name: "strategy", type: "address" },
+    ],
+    outputs: [{ name: "", type: "bool" }],
+  },
+  {
+    type: "function",
+    name: "isStrategyTrusted",
+    stateMutability: "view",
+    inputs: [{ name: "strategy", type: "address" }],
+    outputs: [{ name: "", type: "bool" }],
+  },
+  {
+    type: "function",
+    name: "getStrategyConfig",
+    stateMutability: "view",
+    inputs: [{ name: "strategy", type: "address" }],
+    outputs: [
+      {
+        name: "",
+        type: "tuple",
+        components: [
+          { name: "asset", type: "address" },
+          { name: "isRegistered", type: "bool" },
+          { name: "depositAllowed", type: "bool" },
+          { name: "isTrusted", type: "bool" },
+        ],
+      },
+    ],
+  },
+] as const;
+
+export const PRICE_ORACLE_ABI = [
+  {
+    type: "function",
+    name: "getOracleAdapterForAsset",
+    stateMutability: "view",
+    inputs: [{ name: "asset", type: "address" }],
+    outputs: [{ name: "", type: "address" }],
+  },
+  {
+    type: "function",
+    name: "getPrice",
+    stateMutability: "view",
+    inputs: [{ name: "asset", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+] as const;
+
+export const CHAIN_BALANCE_ORACLE_ABI = [
+  {
+    type: "function",
+    name: "getChainBalanceOracleAdapter",
+    stateMutability: "view",
+    inputs: [{ name: "chainId", type: "uint256" }],
+    outputs: [{ name: "", type: "address" }],
+  },
+  {
+    type: "function",
+    name: "getChainBalance",
+    stateMutability: "view",
+    inputs: [{ name: "chainId", type: "uint256" }],
+    outputs: [
+      {
+        name: "",
+        type: "tuple",
+        components: [
+          { name: "balanceRay", type: "uint256" },
+          { name: "lastUpdateTimestamp", type: "uint256" },
+          { name: "sourceChainTimestamp", type: "uint256" },
+          { name: "sourceChainBlockNumber", type: "uint256" },
+          { name: "isStale", type: "bool" },
+        ],
+      },
+    ],
+  },
+] as const;
+
+export const BASE_CHAIN_GATEWAY_ABI = [
+  {
+    type: "function",
+    name: "isFundsBridgeAdapterSupported",
+    stateMutability: "view",
+    inputs: [
+      { name: "asset", type: "address" },
+      { name: "chainId", type: "uint256" },
+      { name: "bridgeAdapter", type: "address" },
+    ],
+    outputs: [{ name: "", type: "bool" }],
+  },
+  {
+    // Returns the DataOnlyBridgeAdapterMode enum: 0=NOT_SUPPORTED, 1=SEND_AND_RECEIVE, 2=RECEIVE_ONLY.
+    type: "function",
+    name: "getDataOnlyBridgeAdapterMode",
+    stateMutability: "view",
+    inputs: [
+      { name: "chainId", type: "uint256" },
+      { name: "bridgeAdapter", type: "address" },
+    ],
+    outputs: [{ name: "", type: "uint8" }],
+  },
+  {
+    // Returns bytes32(0) when no removal has been initiated for the (chainId, bridgeAdapter) pair.
+    type: "function",
+    name: "getDataOnlyBridgeAdapterRemovalId",
+    stateMutability: "view",
+    inputs: [
+      { name: "chainId", type: "uint256" },
+      { name: "bridgeAdapter", type: "address" },
+    ],
+    outputs: [{ name: "", type: "bytes32" }],
+  },
+  {
+    // Accounting-side wiring: the FundsHandler this gateway forwards through.
+    type: "function",
+    name: "getFundsHandler",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+  },
+  {
+    // Earning-side wiring: the counterparty (accounting) chain id.
+    type: "function",
+    name: "getAccountingChainId",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+] as const;
+
+// Bridge adapters (CcipAdapter / AdiAdapter) inherit BaseBridgeAdapter. Selector mapping is
+// CCIP-specific; getDestinationChainAdapter + getCrossChainController are the cross-chain wiring.
+export const BRIDGE_ADAPTER_ABI = [
+  {
+    type: "function",
+    name: "getChainSelector",
+    stateMutability: "view",
+    inputs: [{ name: "chainId", type: "uint256" }],
+    outputs: [{ name: "", type: "uint64" }],
+  },
+  {
+    type: "function",
+    name: "getChainId",
+    stateMutability: "view",
+    inputs: [{ name: "ccipChainSelector", type: "uint64" }],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "getDestinationChainAdapter",
+    stateMutability: "view",
+    inputs: [{ name: "chainId", type: "uint256" }],
+    outputs: [{ name: "", type: "address" }],
+  },
+  {
+    // AdiAdapter only: the a.DI CrossChainController this adapter routes through.
+    type: "function",
+    name: "getCrossChainController",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+  },
+] as const;
+
+export const POLICY_REGISTRY_ABI = [
+  {
+    type: "function",
+    name: "getPolicy",
+    stateMutability: "view",
+    inputs: [{ name: "policyId", type: "bytes32" }],
+    outputs: [{ name: "", type: "address" }],
+  },
+] as const;
+
+export const FUNDS_HANDLER_ABI = [
+  {
+    type: "function",
+    name: "getEarningChainIds",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256[]" }],
+  },
+] as const;
+
+export const CCIP_ROUTER_ABI = [
+  {
+    type: "function",
+    name: "isChainSupported",
+    stateMutability: "view",
+    inputs: [{ name: "destChainSelector", type: "uint64" }],
+    outputs: [{ name: "", type: "bool" }],
+  },
+] as const;
+
+export const CHAINLINK_SEQUENCER_FEED_ABI = [
+  {
+    type: "function",
+    name: "latestRoundData",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [
+      { name: "roundId", type: "uint80" },
+      { name: "answer", type: "int256" },
+      { name: "startedAt", type: "uint256" },
+      { name: "updatedAt", type: "uint256" },
+      { name: "answeredInRound", type: "uint80" },
+    ],
+  },
+] as const;
+
+export const ACCESS_MANAGER_ABI = [
+  {
+    type: "function",
+    name: "getRoleGrantDelay",
+    stateMutability: "view",
+    inputs: [{ name: "roleId", type: "uint64" }],
+    outputs: [{ name: "", type: "uint32" }],
+  },
+  {
+    type: "function",
+    name: "hasRole",
+    stateMutability: "view",
+    inputs: [
+      { name: "roleId", type: "uint64" },
+      { name: "account", type: "address" },
+    ],
+    outputs: [
+      { name: "isMember", type: "bool" },
+      { name: "executionDelay", type: "uint32" },
+    ],
+  },
+  {
+    type: "function",
+    name: "getTargetFunctionRole",
+    stateMutability: "view",
+    inputs: [
+      { name: "target", type: "address" },
+      { name: "selector", type: "bytes4" },
+    ],
+    outputs: [{ name: "", type: "uint64" }],
+  },
+] as const;

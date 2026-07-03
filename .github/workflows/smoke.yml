@@ -1,0 +1,196 @@
+name: Smoke
+
+# Post-deploy conformance gate: read live PROD on-chain state and diff it against the JSONC
+# config + roles.json that this branch would produce. Catches config<->chain drift on PRs that
+# touch economic config or roles.
+#
+# Gate policy: BLOCKING on real drift. A confirmed parity fail / incomplete deploy
+# (exit 1/2/4) fails the check and blocks the PR; a transient RPC error (exit 3) only warns. The
+# sticky PR comment always posts first, so a blocked PR still shows exactly what diverged.
+#
+# Drift caveat: smoke verifies LIVE prod. A PR that changes config *before* the matching deploy
+# will legitimately diverge from chain. Escape hatch: add the `smoke-config-ahead` label to the
+# PR to skip the whole job (job-level `if`) for an intended config-ahead-of-chain change.
+
+on:
+  pull_request:
+    paths:
+      - "config/deployment-config.*.jsonc"
+      - ".github/workflows/tooling/roles-sync/**"
+      - "script/base/RolesConfig.sol"
+      - "script/base/AccessManager*.sol"
+      - "tools/smoke/**"
+      - ".github/workflows/smoke.yml"
+  workflow_dispatch:
+  schedule:
+    # Daily prod drift monitor (08:00 UTC). Surfaces config<->chain divergence even without a PR.
+    - cron: "0 8 * * *"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: smoke-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke-unit:
+    name: Smoke Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install JS deps
+        run: yarn install --frozen-lockfile
+
+      - name: Typecheck
+        run: yarn smoke:typecheck
+
+      - name: Unit tests
+        run: yarn smoke:test
+
+  smoke-prod:
+    name: Smoke (prod drift)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Skip on forked PRs (no secret access) and on PRs explicitly flagged as config-ahead-of-chain.
+    if: >-
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+      && !contains(github.event.pull_request.labels.*.name, 'smoke-config-ahead')
+    env:
+      ALCHEMY_KEY: ${{ secrets.ALCHEMY_KEY || secrets.ALCHEMY_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Check RPC secret
+        run: |
+          if [ -z "$ALCHEMY_KEY" ]; then
+            echo "Missing ALCHEMY_KEY or ALCHEMY_API_KEY secret for smoke RPC." >&2
+            exit 1
+          fi
+
+      - name: Check dependency access secrets
+        env:
+          DEPENDENCIES_APP_ID: ${{ secrets.DEPENDENCIES_APP_ID }}
+          DEPENDENCIES_PRIVATE_KEY: ${{ secrets.DEPENDENCIES_PRIVATE_KEY }}
+        run: |
+          if [ -z "$DEPENDENCIES_APP_ID" ] || [ -z "$DEPENDENCIES_PRIVATE_KEY" ]; then
+            echo "Missing DEPENDENCIES_APP_ID or DEPENDENCIES_PRIVATE_KEY secret for private dependency access." >&2
+            exit 1
+          fi
+
+      - name: Create dependencies token
+        uses: actions/create-github-app-token@v3
+        id: dependencies-token
+        with:
+          app-id: ${{ secrets.DEPENDENCIES_APP_ID }}
+          private-key: ${{ secrets.DEPENDENCIES_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: |
+            aave-delivery-infrastructure
+          permission-contents: read
+
+      - name: Initialize submodules
+        env:
+          DEPENDENCIES_TOKEN: ${{ steps.dependencies-token.outputs.token }}
+        run: |
+          git config --global url."https://x-access-token:${DEPENDENCIES_TOKEN}@github.com/aave/aave-delivery-infrastructure".insteadOf "https://github.com/aave/aave-delivery-infrastructure"
+          git submodule sync --recursive
+          git submodule update --init --recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install JS deps
+        run: yarn install --frozen-lockfile
+
+      # forge build resolves deployedBytecode so the topology bytecode-hash checks are real
+      # (rather than warning "could not resolve").
+      - name: Build Forge artifacts
+        run: forge build --deny notes
+
+      # roles.json is generated (gitignored). Regenerate it from THIS branch's config so the
+      # AccessManager catalogue reflects the PR's intended roles.
+      - name: Dump roles per env
+        run: yarn roles:dump
+      - name: Build canonical roles.json
+        run: yarn roles:build
+
+      - name: Run smoke against prod
+        id: smoke
+        env:
+          SMOKE_RPC_PROD_ETHEREUM: https://eth-mainnet.g.alchemy.com/v2/${{ env.ALCHEMY_KEY }}
+          SMOKE_RPC_PROD_ARBITRUM: https://arb-mainnet.g.alchemy.com/v2/${{ env.ALCHEMY_KEY }}
+        run: |
+          # Invoke tsx directly (not via `yarn smoke:prod`) so the comment isn't polluted by the
+          # yarn wrapper banner or tsx's "--env-file-if-exists .env not found" notice - CI uses the
+          # real SMOKE_RPC_* env vars below, not a .env file. node_modules/.bin must be on PATH so
+          # run-env's child `spawn("tsx", …)` resolves (yarn would otherwise add it).
+          export PATH="$PWD/node_modules/.bin:$PATH"
+          # Capture the exit code but don't fail here, so the comment posts before the gate decides.
+          set +e
+          tsx tools/smoke/run-env.ts --env prod --summary 2>&1 | tee smoke-summary.txt
+          echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+
+      - name: Build PR comment
+        if: github.event_name == 'pull_request'
+        id: comment
+        run: |
+          case "${{ steps.smoke.outputs.exit_code }}" in
+            0) status="✅ no drift" ;;
+            3) status="⚠️ RPC error (transient - re-run; not blocking)" ;;
+            *) status="❌ drift / incomplete deploy (blocking)" ;;
+          esac
+          {
+            echo 'body<<SMOKE_EOF'
+            echo "### Smoke (prod drift) - $status"
+            echo ""
+            echo "Live prod on-chain state vs this branch's config/roles."
+            echo "If this PR intentionally lands config ahead of the deploy, add the \`smoke-config-ahead\` label to skip this gate."
+            echo ""
+            echo '```'
+            # Strip ANSI color/style escapes - they render as literal garbage in a markdown
+            # code block (the raw Actions log keeps its colors).
+            sed -E 's/\x1b\[[0-9;]*m//g' smoke-summary.txt | tail -c 60000 || true
+            echo '```'
+            echo 'SMOKE_EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Post / update sticky comment
+        if: github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: smoke-prod
+          message: ${{ steps.comment.outputs.body }}
+
+      # Blocking gate: a confirmed parity fail / incomplete deploy (exit 1/2/4) fails the check.
+      # A transient RPC error (exit 3) only warns. The comment above always posts first either way.
+      # The `smoke-config-ahead` label skips the whole job (see job-level `if`), so an intended
+      # config-ahead-of-chain PR is never blocked.
+      - name: Enforce gate (block on drift)
+        if: github.event_name == 'pull_request'
+        run: |
+          code="${{ steps.smoke.outputs.exit_code }}"
+          case "$code" in
+            0) echo "Smoke passed - no drift." ;;
+            3) echo "::warning::Smoke hit an RPC error (exit 3) - transient, not blocking. Re-run if it persists." ;;
+            *) echo "::error::Smoke detected drift / incomplete deploy (exit ${code:-unknown}) - blocking the PR."; exit 1 ;;
+          esac

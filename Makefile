@@ -29,3 +29,7 @@ format :; forge fmt
 
 # Dependencies
 update:; forge update
+
+# Smoke tests
+# Usage: make smoke ENV=preprod CHAIN=accounting [FLAGS="--summary"]
+smoke :; tsx tools/smoke/run.ts --env $(ENV) --chain $(CHAIN) $(FLAGS)
