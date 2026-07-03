@@ -6,6 +6,7 @@ import {IAccessManager} from "lib/openzeppelin-contracts/contracts/access/manage
 
 import {Create3AddressBook} from "script/base/Create3AddressBook.sol";
 import {Create3Deployment} from "script/base/Create3Deployment.sol";
+import {ProfilesConfig} from "script/base/ProfilesConfig.sol";
 import {RolesConfig} from "script/base/RolesConfig.sol";
 import {Create3AddressLib} from "script/libraries/Create3AddressLib.sol";
 import {logSkip} from "script/libraries/DeploymentLogLib.sol";
@@ -13,7 +14,7 @@ import {IMulticall} from "src/interfaces/IMulticall.sol";
 import {OwnedMulticall} from "src/periphery/OwnedMulticall.sol";
 import {_toSelectorArray} from "test/helpers/TypeHelpers.sol";
 
-abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deployment, RolesConfig {
+abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deployment, ProfilesConfig {
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
     //////////////// Operational Profiles Shared between Accounting and Earning Chains ////////////////
@@ -386,12 +387,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         address withdrawalPolicyManagerProfile = _getProfile__WithdrawalPolicyManager();
         require(withdrawalPolicyManagerProfile != address(0), "WithdrawalPolicyManager profile address not set");
 
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](2);
-
-        roles[0] = RolesConfig.getRole__setDefaultFeeBps();
-        roles[1] = RolesConfig.getRole__setAssetFeeBps();
-
-        _grantRolesToProfile(withdrawalPolicyManagerProfile, roles);
+        _grantRolesToProfile(withdrawalPolicyManagerProfile, getProfileRoles__WithdrawalPolicyManager());
     }
 
     function _setupProfile__Rebalancer() internal {
@@ -400,19 +396,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         address rebalancerProfile = _getProfile__Rebalancer();
         require(rebalancerProfile != address(0), "Rebalancer profile address not set");
 
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](5);
-
-        // Allocator
-        roles[0] = RolesConfig.getRole__rebalance();
-        roles[1] = RolesConfig.getRole__setWithdrawalQueue();
-        roles[2] = RolesConfig.getRole__disableDepositsToStrategy();
-        // Cross-chain push. The first is only used on the Accounting Chain (FundsHandler) and the second only on the
-        // Earning Chain (EarningChainGateway), but both are granted in both chain setups so a single profile config can
-        // run either side.
-        roles[3] = RolesConfig.getRole__pushFundsToChain();
-        roles[4] = RolesConfig.getRole__pushFundsToAccountingChain();
-
-        _grantRolesToProfile(rebalancerProfile, roles);
+        _grantRolesToProfile(rebalancerProfile, getProfileRoles__Rebalancer());
     }
 
     function _setupProfile__Disabler() internal {
@@ -421,75 +405,28 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         address disablerProfile = _getProfile__Disabler();
         require(disablerProfile != address(0), "Disabler profile address not set");
 
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](22);
-
-        // Allocator (defensive)
-        roles[0] = RolesConfig.getRole__rebalance();
-        roles[1] = RolesConfig.getRole__removeStrategy();
-        roles[2] = RolesConfig.getRole__disableDepositsToStrategy();
-        roles[3] = RolesConfig.getRole__distrustStrategy();
-        // AssetRegistry (defensive)
-        roles[4] = RolesConfig.getRole__disableAllocatorDeposits();
-        roles[5] = RolesConfig.getRole__disableUserDeposits();
-        roles[6] = RolesConfig.getRole__disableSwapInput();
-        roles[7] = RolesConfig.getRole__disableSwapOutput();
-        roles[8] = RolesConfig.getRole__distrustAsset();
-        // Gateway
-        roles[9] = RolesConfig.getRole__removeFundsBridgeAdapter();
-        // WithdrawalExecutionPolicy
-        roles[10] = RolesConfig.getRole__removeSigner();
-        // SlippageCoverageVault
-        roles[11] = RolesConfig.getRole__lowerPullCapPerTx();
-        roles[12] = RolesConfig.getRole__lowerWindowCap();
-        roles[13] = RolesConfig.getRole__raiseWindowSeconds();
-        // DepositPolicy is Accounting Chain-only, but granted in both chain setups.
-        roles[14] = RolesConfig.getRole__lowerDepositCapacity();
-        roles[15] = RolesConfig.getRole__lowerDepositRefillRate();
-        roles[16] = RolesConfig.getRole__lowerGlobalDepositCapacity();
-        roles[17] = RolesConfig.getRole__lowerGlobalDepositRefillRate();
-        // FundsBridgingPolicy
-        roles[18] = RolesConfig.getRole__lowerBridgingCapacity();
-        roles[19] = RolesConfig.getRole__lowerBridgingRefillRate();
-        roles[20] = RolesConfig.getRole__lowerGlobalBridgingCapacity();
-        roles[21] = RolesConfig.getRole__lowerGlobalBridgingRefillRate();
-
-        _grantRolesToProfile(disablerProfile, roles);
+        _grantRolesToProfile(disablerProfile, getProfileRoles__Disabler());
     }
 
     function _setupProfile__ATokenVaultRewardClaimer() internal {
         address aTokenVaultRewardClaimer = _getProfile__ATokenVaultRewardClaimer();
         require(aTokenVaultRewardClaimer != address(0), "ATokenVaultRewardClaimer profile address not set");
 
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](2);
-
-        roles[0] = RolesConfig.getRole__claimMerklRewards();
-        roles[1] = RolesConfig.getRole__emergencyRescue();
-
-        _grantRolesToProfile(aTokenVaultRewardClaimer, roles);
+        _grantRolesToProfile(aTokenVaultRewardClaimer, getProfileRoles__ATokenVaultRewardClaimer());
     }
 
     function _setupProfile__Funder() internal {
         address funder = _getProfile__Funder();
         require(funder != address(0), "Funder profile address not set");
 
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](2);
-
-        roles[0] = RolesConfig.getRole__topUp();
-        roles[1] = RolesConfig.getRole__fundCoverage();
-
-        _grantRolesToProfile(funder, roles);
+        _grantRolesToProfile(funder, getProfileRoles__Funder());
     }
 
     function _setupProfile__Rescuer() internal {
         address rescuer = _getProfile__Rescuer();
         require(rescuer != address(0), "Rescuer profile address not set");
 
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](2);
-
-        roles[0] = RolesConfig.getRole__rescueTokens();
-        roles[1] = RolesConfig.getRole__rescueNative();
-
-        _grantRolesToProfile(rescuer, roles);
+        _grantRolesToProfile(rescuer, getProfileRoles__Rescuer());
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////

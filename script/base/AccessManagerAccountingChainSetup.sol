@@ -41,14 +41,7 @@ abstract contract AccessManagerAccountingChainSetup is AccessManagerBaseSetup {
         address stableVaultManager = _getProfile__StableVaultManager();
         require(stableVaultManager != address(0), "StableVaultManager profile address not set");
 
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](4);
-
-        roles[0] = RolesConfig.getRole__setUserRate();
-        roles[1] = RolesConfig.getRole__setSubVaultRate();
-        roles[2] = RolesConfig.getRole__setDefaultSubVault();
-        roles[3] = RolesConfig.getRole__claimSurplusInterest();
-
-        _grantRolesToProfile(stableVaultManager, roles);
+        _grantRolesToProfile(stableVaultManager, getProfileRoles__StableVaultManager());
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////
