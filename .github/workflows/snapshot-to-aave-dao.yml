@@ -1,0 +1,116 @@
+name: Snapshot to aave-dao/stable-vault mirror
+
+# Snapshots are always taken from master, regardless of which branch the
+# workflow is dispatched from.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: snapshot-mirror
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: master
+          fetch-depth: 1
+          submodules: false
+          persist-credentials: false
+
+      - name: Configure target deploy key
+        env:
+          SNAPSHOT_DEPLOY_KEY: ${{ secrets.SNAPSHOT_DEPLOY_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SNAPSHOT_DEPLOY_KEY" > ~/.ssh/snapshot_deploy_key
+          chmod 600 ~/.ssh/snapshot_deploy_key
+          # GitHub's published host keys, pinned to avoid trust-on-first-use.
+          # Source: https://api.github.com/meta (docs: "GitHub's SSH key fingerprints")
+          cat >> ~/.ssh/known_hosts <<'EOF'
+          github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
+          github.com ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEmKSENjQEezOmxkZMy7opKgwFB9nkt5YRrYMjNuG5N87uRgg6CLrbo5wAdT/y6v0mKV0U2w0WZ2YB/++Tpockg=
+          github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk=
+          EOF
+          cat >> ~/.ssh/config <<'EOF'
+          Host github.com
+            HostName github.com
+            User git
+            IdentityFile ~/.ssh/snapshot_deploy_key
+            IdentitiesOnly yes
+          EOF
+
+      - name: Build snapshot commit with gitlinks
+        id: build
+        shell: bash
+        run: |
+          set -euo pipefail
+          SNAP=/tmp/snap
+          rm -rf "$SNAP"
+
+          # Clone the target so each snapshot is committed on top of the
+          # previous one, preserving mirror history. Fall back to a plain
+          # clone when the target has no master branch yet (first run).
+          TARGET=git@github.com:aave-dao/stable-vault.git
+          git clone --depth 1 --branch master "$TARGET" "$SNAP" \
+            || git clone --depth 1 "$TARGET" "$SNAP"
+          cd "$SNAP"
+
+          # Clear the previous snapshot's working tree, keeping .git.
+          find . -mindepth 1 -maxdepth 1 -not -name .git -exec rm -rf {} +
+
+          # Build exclusions (anchored to the transfer root): .github is
+          # deliberately excluded so the mirror never runs actions, and
+          # submodule directories are excluded so only gitlinks are mirrored.
+          rsync_excludes=(--exclude /.git --exclude /.github)
+          if [[ -f "${GITHUB_WORKSPACE}/.gitmodules" ]]; then
+            while read -r path; do
+              rsync_excludes+=(--exclude "/$path")
+            done < <(git -C "${GITHUB_WORKSPACE}" config -f .gitmodules --get-regexp '^submodule\..*\.path' | awk '{print $2}')
+          fi
+
+          # Copy tracked working tree content, but not submodule contents/directories.
+          rsync -a --delete "${rsync_excludes[@]}" "${GITHUB_WORKSPACE}/" "$SNAP/"
+
+          git add -A
+
+          # Recreate each submodule as a gitlink pointing to the pinned commit.
+          # This does not clone/fetch submodules, so private dependency access is not required here.
+          if [[ -f "${GITHUB_WORKSPACE}/.gitmodules" ]]; then
+            git -C "${GITHUB_WORKSPACE}" config -f .gitmodules --get-regexp '^submodule\..*\.path' | while read -r _ path; do
+              mode="" sha=""
+              read -r mode _type sha _ < <(git -C "${GITHUB_WORKSPACE}" ls-tree HEAD -- "$path") || true
+              if [[ "$mode" != "160000" || -z "$sha" ]]; then
+                echo "Expected gitlink (mode 160000) for submodule path $path, got mode '${mode:-none}' — is .gitmodules stale?" >&2
+                exit 1
+              fi
+              git update-index --add --cacheinfo 160000 "$sha" "$path"
+            done
+          fi
+
+          # Skip the push when the snapshot is identical to the previous one.
+          if git rev-parse -q --verify HEAD >/dev/null && git diff --cached --quiet; then
+            echo "No changes since last snapshot; nothing to push."
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          SOURCE_SHA="$(git -C "${GITHUB_WORKSPACE}" rev-parse HEAD)"
+          git -c user.name="Snapshot Bot" -c user.email="snapshot-bot@local" commit -m "Snapshot (preserve submodules) ${SOURCE_SHA}"
+          echo "has_changes=true" >> "$GITHUB_OUTPUT"
+
+      - name: Push to target
+        if: steps.build.outputs.has_changes == 'true'
+        run: |
+          cd /tmp/snap
+          git push origin HEAD:master
+
+      - name: Clean up
+        if: always()
+        run: rm -rf /tmp/snap
