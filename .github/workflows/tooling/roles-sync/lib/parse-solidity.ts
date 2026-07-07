@@ -91,14 +91,45 @@ export function parseGetAllFunctionBasedRolesOrder(path: string): string[] {
 /**
  * Parses every `_setupProfile__X` function across the supplied AccessManager*Setup files and returns a flat map of
  * profile name → grants. `MainAdmin` is recognised as `ALL`; `SecondaryAdmin` as `ALL_NON_CRITICAL`; the rest are
- * captured as `EXPLICIT` with the ordered list of `RolesConfig.getRole__X()` calls. The function also picks up the
+ * captured as `EXPLICIT` with the ordered list of `getRole__X()` calls. The function also picks up the
  * guardian-role grants (`ADMIN_ROLE_GUARDIAN_ROLE`, `OPERATIONAL_ROLE_GUARDIAN_ROLE`) per profile.
+ *
+ * Explicit role lists may be declared inline (`RolesConfig.getRole__X()` calls in the `_setupProfile__` body) or via
+ * the ProfilesConfig indirection (`_grantRolesToProfile(profile, getProfileRoles__X())`, the role list living in
+ * `getProfileRoles__X()` — the post-#374 single-source-of-truth style). Pass `ProfilesConfig.sol` in `paths`
+ * alongside the setup files; a `getProfileRoles__X()` reference with no parsed definition throws rather than
+ * silently dropping the profile's grants.
  */
 export function parseProfiles(paths: string[]): Map<string, ProfileGrants> {
   const out = new Map<string, ProfileGrants>();
+  const sources = paths.map((path) => ({ path, src: readFileSync(path, "utf8") }));
 
-  for (const path of paths) {
-    const src = readFileSync(path, "utf8");
+  // Pass 1: collect getProfileRoles__X() role-list definitions (ProfilesConfig.sol). Calls are bare
+  // `getRole__X()` there (ProfilesConfig inherits RolesConfig), so match the qualifier optionally.
+  const profileRoleLists = new Map<string, string[]>();
+  for (const { path, src } of sources) {
+    const defRe = /function\s+getProfileRoles__([A-Za-z0-9_]+)\s*\([^)]*\)[^{]*\{/g;
+    let d: RegExpExecArray | null;
+    while ((d = defRe.exec(src)) !== null) {
+      const name = d[1] ?? "";
+      const bodyEnd = findMatchingBrace(src, defRe.lastIndex - 1);
+      if (bodyEnd === -1) {
+        throw new Error(`${path}: unbalanced braces in getProfileRoles__${name}`);
+      }
+      const body = src.slice(defRe.lastIndex, bodyEnd);
+      const fns: string[] = [];
+      const callRe = /\b(?:RolesConfig\.)?(getRole__[A-Za-z0-9_]+)\s*\(\s*\)/g;
+      let c: RegExpExecArray | null;
+      while ((c = callRe.exec(body)) !== null) {
+        fns.push(c[1] ?? "");
+      }
+      profileRoleLists.set(name, fns);
+    }
+  }
+
+  // Pass 2: parse _setupProfile__X bodies; explicit grants = inline getRole__ calls plus resolved
+  // getProfileRoles__Y() references, in source order.
+  for (const { path, src } of sources) {
     const headerRe = /function\s+_setupProfile__([A-Za-z0-9_]+)\s*\(\s*\)[^{]*\{/g;
     let m: RegExpExecArray | null;
     while ((m = headerRe.exec(src)) !== null) {
@@ -111,10 +142,21 @@ export function parseProfiles(paths: string[]): Map<string, ProfileGrants> {
       const body = src.slice(bodyStart, bodyEnd);
 
       const explicit: string[] = [];
-      const callRe = /RolesConfig\.(getRole__[A-Za-z0-9_]+)\s*\(\s*\)/g;
+      const grantRe =
+        /\b(?:RolesConfig\.)?(getRole__[A-Za-z0-9_]+)\s*\(\s*\)|\bgetProfileRoles__([A-Za-z0-9_]+)\s*\(\s*\)/g;
       let c: RegExpExecArray | null;
-      while ((c = callRe.exec(body)) !== null) {
-        explicit.push(c[1] ?? "");
+      while ((c = grantRe.exec(body)) !== null) {
+        if (c[1]) {
+          explicit.push(c[1]);
+        } else if (c[2]) {
+          const resolved = profileRoleLists.get(c[2]);
+          if (!resolved) {
+            throw new Error(
+              `${path}: _setupProfile__${profile} references getProfileRoles__${c[2]}() but no definition was parsed — is ProfilesConfig.sol included in the parse paths?`,
+            );
+          }
+          explicit.push(...resolved);
+        }
       }
 
       const grantPolicy = inferGrantPolicy(profile, body);

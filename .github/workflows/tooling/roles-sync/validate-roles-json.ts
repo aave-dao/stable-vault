@@ -100,6 +100,19 @@ function main(): void {
     }
   }
 
+  // Every EXPLICIT profile must be granted at least one role. An EXPLICIT profile with zero grantedTo
+  // entries means the Solidity parse lost its role list (e.g. the #374 ProfilesConfig indirection not
+  // being followed) — a silent-drop failure mode that must never validate.
+  for (const profile of artifact.profiles) {
+    if (profile.grantPolicy !== "EXPLICIT") continue;
+    const grantedCount = activeRoles.filter((r) => r.grantedTo.includes(profile.name)).length;
+    if (grantedCount === 0) {
+      fail(
+        `Profile ${profile.name}: EXPLICIT grant policy but appears in no role's grantedTo — profile role list was not extracted from the setup sources`,
+      );
+    }
+  }
+
   const activeParameters = (artifact.parameters ?? []).filter((p) => p.status === "Active");
   assertUniqueBy(activeParameters, (p) => p.key, "parameter key", fail);
   assertUniqueBy(activeParameters, (p) => p.jsonPath, "parameter jsonPath", fail);
