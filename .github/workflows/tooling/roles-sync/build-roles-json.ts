@@ -6,7 +6,8 @@
  * Pipeline:
  *   1. Three Forge dumps (`.github/workflows/tooling/roles-sync/output/roles.dump.{staging,preprod,prod}.json`), one per env.
  *   2. `script/base/RolesConfig.sol`            → natspec, selector source, getAllFunctionBasedRoles ordering.
- *   3. `script/base/AccessManager*Setup.sol`    → profile → role grants, guardian-role membership.
+ *   3. `script/base/AccessManager*Setup.sol` + `script/base/ProfilesConfig.sol`
+ *                                               → profile → role grants, guardian-role membership.
  *   4. `config/deployment-config.*.jsonc`       → per-env profile addresses + deployment parameter values.
  *   5. `out/<Contract>.sol/<Contract>.json`     → canonical function signatures via methodIdentifiers.
  *   6. `.github/workflows/tooling/roles-sync/lib/parameters-spec.ts` → hand-curated parameter catalogue (key → setter, unit, limits).
@@ -42,13 +43,16 @@ const ACCESS_MANAGER_PATHS = [
   join(REPO_ROOT, "script/base/AccessManagerAccountingChainSetup.sol"),
   join(REPO_ROOT, "script/base/AccessManagerEarningChainSetup.sol"),
 ];
+// Single source of truth for the explicit profile role lists, referenced from the setup files via
+// getProfileRoles__X() — must be parsed and hash-tracked alongside them.
+const PROFILES_CONFIG_PATH = join(REPO_ROOT, "script/base/ProfilesConfig.sol");
 const FORGE_OUT_DIR = join(REPO_ROOT, "out");
 const OUT_PATH = join(REPO_ROOT, ".github/workflows/tooling/roles-sync/output/roles.json");
 
 function main(): void {
   const natspec = parseRolesConfig(ROLES_CONFIG_PATH);
   const order = parseGetAllFunctionBasedRolesOrder(ROLES_CONFIG_PATH);
-  const profiles = parseProfiles(ACCESS_MANAGER_PATHS);
+  const profiles = parseProfiles([...ACCESS_MANAGER_PATHS, PROFILES_CONFIG_PATH]);
   const dumps = loadDumps();
 
   assertDumpsAgreeOnShape(dumps, order);
@@ -92,6 +96,7 @@ function main(): void {
       accessManagerBaseSetupSha: sha256OfFile(ACCESS_MANAGER_PATHS[0] ?? ""),
       accessManagerAccountingChainSetupSha: sha256OfFile(ACCESS_MANAGER_PATHS[1] ?? ""),
       accessManagerEarningChainSetupSha: sha256OfFile(ACCESS_MANAGER_PATHS[2] ?? ""),
+      profilesConfigSha: sha256OfFile(PROFILES_CONFIG_PATH),
       deploymentConfigShas,
     },
     delayTiers,

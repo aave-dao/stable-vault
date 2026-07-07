@@ -130,6 +130,7 @@ export interface RolesArtifact {
     accessManagerBaseSetupSha: string;
     accessManagerAccountingChainSetupSha: string;
     accessManagerEarningChainSetupSha: string;
+    profilesConfigSha: string;
     deploymentConfigShas: Record<Env, string>;
   };
   delayTiers: DelayTierJson[];
