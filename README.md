@@ -8,6 +8,10 @@ The protocol utilizes a modular architecture and cross-chain capabilities, separ
 
 - [Protocol Overview](#protocol-overview)
   - [Yield Generation \& Cross-Chain Architecture](#yield-generation--cross-chain-architecture)
+    - [Yield Mechanics](#yield-mechanics)
+    - [Cross-Chain Flow](#cross-chain-flow)
+    - [Oracle Architecture](#oracle-architecture)
+    - [Manager Roles](#manager-roles)
 - [User Guide](#user-guide)
   - [Deposits](#deposits)
   - [Withdrawals](#withdrawals)
@@ -35,18 +39,21 @@ The core component is the `StableVault`, which manages user positions, sub-vault
 
 Funds deposited into the protocol are managed by `Allocator` contracts (one `Allocator` is deployed to each of the Accounting Chain and Earning Chains), which deploy assets into yield-generating strategies.
 
-**Yield Mechanics:**
+#### Yield Mechanics
+
 - **Allocator**: Holds idle funds and deposits them into whitelisted strategies which act as ERC-4626 compliant adapters to underlying yield-generating protocols.
 - **Rebalancing**: Managers can call `rebalance()` on the Allocator to move funds between strategies or swap assets to optimize yield. Swaps are enforced to be 1:1 where a `slippage coverage source` must make up the difference for slippage and/or fees.
 
-**Cross-Chain Flow:**
+#### Cross-Chain Flow
+
 The protocol operates on a model where the Accounting Chain is the primary command center and Earning Chains act as sources of yield. Contracts on the Earning Chain can only bridge funds back to their canonical Accounting Chain.
 
 - **Accounting Chain**: Hosts the `StableVault`, `FundsHandler` and `Allocator` for local yield strategies. It tracks the global state of user deposits and total system liquidity.
 - **Earning Chains**: Host `EarningChainGateway` and local `Allocator`s. Funds are bridged here to access yield opportunities not available on the Accounting Chain.
 - **Bridge adapters**: Cross-chain messages and funds move through bridge adapters. The repository currently includes Chainlink CCIP and a.DI adapters.
 
-**Oracle Architecture:**
+#### Oracle Architecture
+
 - **Price oracles (both chains)**:
   - `PriceOracle` is the canonical price entry point for protocol contracts.
   - Asset-specific adapters (e.g. `ChainlinkPriceOracleAdapter`) are registered on `PriceOracle`.
@@ -62,7 +69,8 @@ The protocol operates on a model where the Accounting Chain is the primary comma
   - `EarningChainStateProvider.getState()` encodes the Earning Chain balance snapshot (`balanceRay`, source timestamp, source block number).
   - This snapshot is published by the Chainlink network to a bundle feed consumed by `ChainlinkChainBalanceOracleAdapter`.
 
-**Manager Roles:**
+#### Manager Roles
+
 1. **Bridging Funds**:
    - Managers call `pushFundsToChain` on the `FundsHandler`. This bridges assets via the `AccountingChainGateway` to an Earning Chain.
    - Managers call `pushFundsToAccountingChain` on the `EarningChainGateway` to return funds to the Accounting Chain.
