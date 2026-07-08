@@ -29,6 +29,7 @@ The protocol utilizes a modular architecture and cross-chain capabilities, separ
   - [Security](#security)
     - [Audit Reports](#audit-reports)
     - [Bug Bounty](#bug-bounty)
+  - [License](#license)
 
 ## Protocol Overview
 
@@ -227,3 +228,7 @@ The protocol has been audited by multiple security firms. Reports are available 
 ### Bug Bounty
 
 Further details will be made available soon.
+
+## License
+
+Stable Vaults software is under a proprietary license (All Rights Reserved © Aave Labs), see [LICENSE](./LICENSE). Each Solidity file declares its applicable license.
