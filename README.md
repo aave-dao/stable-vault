@@ -6,27 +6,29 @@ The protocol utilizes a modular architecture and cross-chain capabilities, separ
 
 ## Table of Contents
 
-- [Protocol Overview](#protocol-overview)
-  - [Yield Generation \& Cross-Chain Architecture](#yield-generation--cross-chain-architecture)
-    - [Yield Mechanics](#yield-mechanics)
-    - [Cross-Chain Flow](#cross-chain-flow)
-    - [Oracle Architecture](#oracle-architecture)
-    - [Manager Roles](#manager-roles)
-- [User Guide](#user-guide)
-  - [Deposits](#deposits)
-  - [Withdrawals](#withdrawals)
-- [Repository Structure](#repository-structure)
-- [Dependencies](#dependencies)
-  - [Required](#required)
-  - [Dependency Strategy](#dependency-strategy)
-- [Development](#development)
-  - [Build](#build)
-  - [Test](#test)
-  - [Gas Snapshots](#gas-snapshots)
-  - [Format](#format)
-- [Security](#security)
-  - [Audit Reports](#audit-reports)
-  - [Bug Bounty](#bug-bounty)
+- [Stable Vaults](#stable-vaults)
+  - [Table of Contents](#table-of-contents)
+  - [Protocol Overview](#protocol-overview)
+    - [Yield Generation \& Cross-Chain Architecture](#yield-generation--cross-chain-architecture)
+      - [Yield Mechanics](#yield-mechanics)
+      - [Cross-Chain Flow](#cross-chain-flow)
+      - [Oracle Architecture](#oracle-architecture)
+      - [Manager Roles](#manager-roles)
+  - [User Guide](#user-guide)
+    - [Deposits](#deposits)
+    - [Withdrawals](#withdrawals)
+  - [Repository Structure](#repository-structure)
+  - [Dependencies](#dependencies)
+    - [Required](#required)
+    - [Dependency Strategy](#dependency-strategy)
+  - [Development](#development)
+    - [Build](#build)
+    - [Test](#test)
+    - [Gas Snapshots](#gas-snapshots)
+    - [Format](#format)
+  - [Security](#security)
+    - [Audit Reports](#audit-reports)
+    - [Bug Bounty](#bug-bounty)
 
 ## Protocol Overview
 
@@ -134,9 +136,17 @@ stable-vault/
 │   ├── libraries/                # Shared libraries (Math, Assets, etc.)
 │   ├── misc/                     # Miscellaneous utils (contracts inherited by core/periphery contracts)
 │   ├── oracles/                  # Price and chain balance oracle contracts and adapters
+│   │   ├── balance/              # Chain balance oracle and adapters
+│   │   ├── common/               # Shared oracle logic
+│   │   └── price/                # Price oracle and adapters
 │   ├── periphery/                # Peripheral contracts (registries, swapper, coverage vault, etc.)
 │   ├── policies/                 # Deposit, withdrawal-execution, and funds-bridging policies
+│   │   └── base/                 # Shared policy base contracts
 │   └── types/                    # Shared constants and errors
+├── config/                       # Deployment configuration per environment
+├── deployments/                  # Deployment address artifacts per environment
+├── audits/                       # Security audit reports
+├── tools/                        # Auxiliary tooling
 ├── test/                         # Test suite
 ├── script/                       # Deployment, upgrade, setup, and interaction scripts
 └── lib/                          # Foundry dependencies
