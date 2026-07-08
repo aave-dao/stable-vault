@@ -1,9 +1,9 @@
 {
+  "lib/aave-delivery-infrastructure": {
+    "rev": "2a66a15aab3c6b6ab57b1eb7c26c2455e2e252fd"
+  },
   "lib/aave-vault": {
-    "branch": {
-      "name": "5ab52d20b07f35a8f34e6702f2fea6797a5787eb",
-      "rev": "5ab52d20b07f35a8f34e6702f2fea6797a5787eb"
-    }
+    "rev": "5ab52d20b07f35a8f34e6702f2fea6797a5787eb"
   },
   "lib/chainlink-ccip": {
     "rev": "76e3647a648bd4b8cc483515ed13bc111e5fb16b"

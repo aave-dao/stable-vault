@@ -19,7 +19,6 @@
 [submodule "lib/aave-vault"]
 	path = lib/aave-vault
 	url = https://github.com/aave/aave-vault
-	branch = 5ab52d20b07f35a8f34e6702f2fea6797a5787eb
 [submodule "lib/pigeon"]
 	path = lib/pigeon
 	url = https://github.com/exp-table/pigeon
