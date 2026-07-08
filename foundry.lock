@@ -1,6 +1,9 @@
 {
   "lib/aave-delivery-infrastructure": {
-    "rev": "2a66a15aab3c6b6ab57b1eb7c26c2455e2e252fd"
+    "tag": {
+      "name": "deploy-prod-2026-06-11",
+      "rev": "2e0f4d746e2b74b73b1e4d855962d731078fcead"
+    }
   },
   "lib/aave-vault": {
     "rev": "5ab52d20b07f35a8f34e6702f2fea6797a5787eb"
