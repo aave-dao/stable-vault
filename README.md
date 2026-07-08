@@ -7,12 +7,22 @@ The protocol utilizes a modular architecture and cross-chain capabilities, separ
 ## Table of Contents
 
 - [Protocol Overview](#protocol-overview)
+  - [Yield Generation \& Cross-Chain Architecture](#yield-generation--cross-chain-architecture)
 - [User Guide](#user-guide)
   - [Deposits](#deposits)
   - [Withdrawals](#withdrawals)
 - [Repository Structure](#repository-structure)
 - [Dependencies](#dependencies)
+  - [Required](#required)
+  - [Dependency Strategy](#dependency-strategy)
 - [Development](#development)
+  - [Build](#build)
+  - [Test](#test)
+  - [Gas Snapshots](#gas-snapshots)
+  - [Format](#format)
+- [Security](#security)
+  - [Audit Reports](#audit-reports)
+  - [Bug Bounty](#bug-bounty)
 
 ## Protocol Overview
 
@@ -175,3 +185,27 @@ Generated files in `snapshots/`:
 ```bash
 forge fmt
 ```
+
+## Security
+
+### Audit Reports
+
+The protocol has been audited by multiple security firms. Reports are available under the [`audits/`](./audits) directory:
+
+- Certora
+  - [2026-01 - Stable Vaults](<./audits/[Certora] 01-26 - Aave Stable Vaults.pdf>)
+  - [2026-04 - Stable Vaults](<./audits/[Certora] 04-26 - Aave Stable Vaults.pdf>)
+  - [2026-05 - Stable Vaults](<./audits/[Certora] 05-26 - Aave Stable Vaults.pdf>)
+  - [2026-06 - Aave a.DI](<./audits/[Certora] 06-26 - Aave a.DI.pdf>)
+- ChainSecurity
+  - [2026-03 - Stable Vaults](<./audits/[ChainSecurity] 03-26 - Stable Vaults.pdf>)
+  - [2026-05 - Stable Vaults](<./audits/[ChainSecurity] 05-26 - Stable Vaults.pdf>)
+- J. Feist
+  - [2026-07 - Stable Vaults](<./audits/[J. Feist] 07-26 - Stable Vaults.pdf>)
+  - [2026-07 - Stable Vaults (Extension 1)](<./audits/[J. Feist] 07-26 - Stable Vaults - Extension 1.pdf>)
+  - [2026-07 - Stable Vaults (Extension 2)](<./audits/[J. Feist] 07-26 - Stable Vaults - Extension 2.pdf>)
+  - [2026-07 - Stable Vaults (Extension 3)](<./audits/[J. Feist] 07-26 - Stable Vaults - Extension 3.pdf>)
+
+### Bug Bounty
+
+Further details will be made available soon.
