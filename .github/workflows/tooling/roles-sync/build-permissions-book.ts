@@ -3,22 +3,18 @@
  * `STABLE_VAULTS` pool, derived from `output/roles.json` (run `yarn roles:build` first):
  *
  *   1. `output/permissions-book/functionsPermissionsStableVaults.json`
- *      Book-format static permissions JSON: one entry per *target* contract
- *      (each `locations[]` member), listing every AccessManager-gated function
- *      with its signature. The book resolves selectors from the signatures and
- *      matches them against on-chain `TargetFunctionRoleUpdated` events, so this
- *      file only supplies human-readable names — bindings are always live.
+ *      One entry per *target* contract (each `locations[]` member), listing every
+ *      AccessManager-gated function with its signature. Supplies only the function
+ *      names/signatures; the book resolves the live bindings itself.
  *
  *   2. `output/permissions-book/roleLabelsStableVaults.json`
  *      roleId → canonical role name (`roles[].key`), plus the three meta-roles.
- *      Fed to the book's `roleLabels` pool-config fallback because the SV
- *      AccessManager is the standard OZ variant: `getLabelOfRole()` does not
- *      exist on-chain (the book's V4 path expects the Enumerable variant).
+ *      The AccessManager exposes no on-chain label getter, so role names must be
+ *      supplied statically.
  *
- * Both files are copied verbatim into the book repo's `statics/` when they change.
- * The book's cron keeps membership/bindings fresh from events; these statics only
- * go stale when RolesConfig.sol adds/renames role-gated functions — regenerate and
- * re-PR to the book whenever this script's output differs from the book's copy.
+ * Both files are copied into the book repo's `statics/`. They only go stale when
+ * RolesConfig.sol adds or renames role-gated functions — regenerate and re-PR to
+ * the book whenever this script's output differs from the book's copy.
  */
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
@@ -60,8 +56,8 @@ function main(): void {
       if (!byLocation.has(location)) byLocation.set(location, new Map());
       const fns = byLocation.get(location)!;
       if (!fns.has(role.selector)) {
-        // The literal role string "restricted" mirrors the book's V4 static file:
-        // actual roleIds come from live TargetFunctionRoleUpdated events.
+        // "restricted" is a placeholder; the book fills in the real roleIds from
+        // live on-chain data, so only the name/signature matter here.
         fns.set(role.selector, { name, roles: ["restricted"], signature: role.signature });
       }
     }
