@@ -1,5 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
-// Copyright (c) 2025 Aave Labs
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
 // From Lens V3 code - https://github.com/lens-protocol/lens-v3/blob/development/test/mocks/MockUniversal.sol
