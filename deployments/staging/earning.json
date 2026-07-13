@@ -116,5 +116,9 @@
   "DisablerMulticall": {
     "address": "0x53023407b6ebe20735c903a6a03d1c82a0606705",
     "saltSeed": "aave.stable-vault.OwnedMulticall.DisablerProfile"
+  },
+  "ChainlinkPriceOracleAdapter::USDG": {
+    "address": "0xed9739211292e2F31192C09646E7E36c7e6B2112",
+    "saltSeed": "aave.stable-vault.ChainlinkPriceOracleAdapter.0xe343167631d89b6ffc58b88d6b7fb0228795491d"
   }
 }
