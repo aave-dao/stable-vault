@@ -215,6 +215,7 @@ The protocol has been audited by multiple security firms. Reports are available 
   - [2026-01 - Stable Vaults](<./audits/[Certora] 01-26 - Aave Stable Vaults.pdf>)
   - [2026-04 - Stable Vaults](<./audits/[Certora] 04-26 - Aave Stable Vaults.pdf>)
   - [2026-05 - Stable Vaults](<./audits/[Certora] 05-26 - Aave Stable Vaults.pdf>)
+  - [2026-06 - Stable Vaults (Formal Verification)](<./audits/[Certora] 06-26 - Aave Stable Vaults - FV.pdf>)
   - [2026-06 - Aave a.DI](<./audits/[Certora] 06-26 - Aave a.DI.pdf>)
 - ChainSecurity
   - [2026-03 - Stable Vaults](<./audits/[ChainSecurity] 03-26 - Stable Vaults.pdf>)
