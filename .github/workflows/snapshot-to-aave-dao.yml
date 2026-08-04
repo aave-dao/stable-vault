@@ -13,6 +13,9 @@ concurrency:
 
 jobs:
   publish:
+    # This workflow is mirrored to aave-dao/stable-vault as part of preserving
+    # full commit history. Keep it inert anywhere except the source repository.
+    if: github.repository == 'aave/stable-vault'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
