@@ -1,7 +1,6 @@
-name: Snapshot to aave-dao/stable-vault mirror
+name: Publish to aave-dao/stable-vault mirror
 
-# Snapshots are always taken from master, regardless of which branch the
-# workflow is dispatched from.
+# Publishes master to the aave-dao/stable-vault mirror with commit history intact.
 on:
   workflow_dispatch:
 
@@ -13,13 +12,16 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  snapshot:
+  publish:
+    # This workflow is mirrored to aave-dao/stable-vault as part of preserving
+    # full commit history. Keep it inert anywhere except the source repository.
+    if: github.repository == 'aave/stable-vault'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
         with:
           ref: master
-          fetch-depth: 1
+          fetch-depth: 0
           submodules: false
           persist-credentials: false
 
@@ -46,71 +48,15 @@ jobs:
             IdentitiesOnly yes
           EOF
 
-      - name: Build snapshot commit with gitlinks
-        id: build
+      - name: Push source history to target
         shell: bash
         run: |
           set -euo pipefail
-          SNAP=/tmp/snap
-          rm -rf "$SNAP"
-
-          # Clone the target so each snapshot is committed on top of the
-          # previous one, preserving mirror history. Fall back to a plain
-          # clone when the target has no master branch yet (first run).
           TARGET=git@github.com:aave-dao/stable-vault.git
-          git clone --depth 1 --branch master "$TARGET" "$SNAP" \
-            || git clone --depth 1 "$TARGET" "$SNAP"
-          cd "$SNAP"
-
-          # Clear the previous snapshot's working tree, keeping .git.
-          find . -mindepth 1 -maxdepth 1 -not -name .git -exec rm -rf {} +
-
-          # Build exclusions (anchored to the transfer root): .github is
-          # deliberately excluded so the mirror never runs actions, and
-          # submodule directories are excluded so only gitlinks are mirrored.
-          rsync_excludes=(--exclude /.git --exclude /.github)
-          if [[ -f "${GITHUB_WORKSPACE}/.gitmodules" ]]; then
-            while read -r path; do
-              rsync_excludes+=(--exclude "/$path")
-            done < <(git -C "${GITHUB_WORKSPACE}" config -f .gitmodules --get-regexp '^submodule\..*\.path' | awk '{print $2}')
-          fi
-
-          # Copy tracked working tree content, but not submodule contents/directories.
-          rsync -a --delete "${rsync_excludes[@]}" "${GITHUB_WORKSPACE}/" "$SNAP/"
-
-          git add -A
-
-          # Recreate each submodule as a gitlink pointing to the pinned commit.
-          # This does not clone/fetch submodules, so private dependency access is not required here.
-          if [[ -f "${GITHUB_WORKSPACE}/.gitmodules" ]]; then
-            git -C "${GITHUB_WORKSPACE}" config -f .gitmodules --get-regexp '^submodule\..*\.path' | while read -r _ path; do
-              mode="" sha=""
-              read -r mode _type sha _ < <(git -C "${GITHUB_WORKSPACE}" ls-tree HEAD -- "$path") || true
-              if [[ "$mode" != "160000" || -z "$sha" ]]; then
-                echo "Expected gitlink (mode 160000) for submodule path $path, got mode '${mode:-none}' — is .gitmodules stale?" >&2
-                exit 1
-              fi
-              git update-index --add --cacheinfo 160000 "$sha" "$path"
-            done
-          fi
-
-          # Skip the push when the snapshot is identical to the previous one.
-          if git rev-parse -q --verify HEAD >/dev/null && git diff --cached --quiet; then
-            echo "No changes since last snapshot; nothing to push."
-            echo "has_changes=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          SOURCE_SHA="$(git -C "${GITHUB_WORKSPACE}" rev-parse HEAD)"
-          git -c user.name="Snapshot Bot" -c user.email="snapshot-bot@local" commit -m "Snapshot (preserve submodules) ${SOURCE_SHA}"
-          echo "has_changes=true" >> "$GITHUB_OUTPUT"
-
-      - name: Push to target
-        if: steps.build.outputs.has_changes == 'true'
-        run: |
-          cd /tmp/snap
-          git push origin HEAD:master
-
-      - name: Clean up
-        if: always()
-        run: rm -rf /tmp/snap
+          SOURCE_SHA="$(git rev-parse HEAD)"
+          git remote add target "$TARGET"
+          echo "Publishing source master at ${SOURCE_SHA} to ${TARGET} master"
+          # Force is required to replace any previous snapshot-only history with
+          # the real source history. Subsequent runs remain fast-forwards unless
+          # the source master itself was rewritten.
+          git push target HEAD:master --force
