@@ -1,0 +1,19 @@
+.github/workflows/dependency-review.yml
+  s_a52ca1653162b5::t_db19323dfb13ca 11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "a95e51db0ba10a9a835a39c79a4a4cf5564d61ab",
+  "prompts": {},
+  "sessions": {
+    "s_a52ca1653162b5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0ce86-2834-7e40-9253-f46b34498329",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Ralph Raule <ralph@aave.com>"
+    }
+  }
+}
